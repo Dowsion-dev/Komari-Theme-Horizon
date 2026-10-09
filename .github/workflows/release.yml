@@ -1,16 +1,20 @@
 name: Release
 
+# A release is published whenever main carries a komari-theme.json version that has no release yet
+# (bump with tools/bump.py, add a CHANGELOG section, push). Pushing a v* tag yourself also works.
 on:
   push:
+    branches: [main]
+    paths: ['komari-theme.json', '.github/workflows/release.yml']
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing tag to (re)publish, e.g. v1.4.0'
-        required: true
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -20,35 +24,41 @@ jobs:
 
       - name: Resolve version
         id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          VERSION="${TAG#v}"
-          MANIFEST=$(python3 -c "import json;print(json.load(open('komari-theme.json'))['version'])")
-          if [ "$MANIFEST" != "$VERSION" ]; then
-            echo "::error::Tag $TAG does not match komari-theme.json version $MANIFEST (run tools/bump.py first)"; exit 1
+          VERSION=$(python3 -c "import json;print(json.load(open('komari-theme.json'))['version'])")
+          TAG="v$VERSION"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "$TAG" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match komari-theme.json version $VERSION (run tools/bump.py first)"; exit 1
           fi
           grep -q "?v=$VERSION\"" dist/index.html || { echo "::error::dist/index.html asset ?v= is not $VERSION (run tools/bump.py)"; exit 1; }
+          if gh release view "$TAG" >/dev/null 2>&1 && [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "Release $TAG already exists — nothing to do."; echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Package theme
+        if: steps.v.outputs.skip != 'true'
         run: bash tools/package.sh
 
       - name: Release notes from CHANGELOG
+        if: steps.v.outputs.skip != 'true'
         run: |
           python3 - <<'PY' > notes.md
           import re
           v = "${{ steps.v.outputs.version }}"
           text = open('CHANGELOG.md', encoding='utf-8').read()
           m = re.search(r'^## ' + re.escape(v) + r'\s*\n(.*?)(?=^## |\Z)', text, re.S | re.M)
-          body = m.group(1).strip() if m else 'See CHANGELOG.md'
-          print(body)
+          print(m.group(1).strip() if m else 'See CHANGELOG.md')
           print()
           print('**安装**：Komari 后台 → 设置 → 主题 → 上传 `Komari-Theme-Horizon-v%s.zip`' % v)
           PY
           cat notes.md
 
       - name: Publish release
+        if: steps.v.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -58,5 +68,5 @@ jobs:
             gh release upload "$TAG" "$ZIP" --clobber
             gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" "$ZIP" --title "Horizon $TAG" --notes-file notes.md
+            gh release create "$TAG" "$ZIP" --target "$GITHUB_SHA" --title "Horizon $TAG" --notes-file notes.md
           fi

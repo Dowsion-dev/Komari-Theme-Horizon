@@ -73,10 +73,10 @@ ADMIN=1 node tools/mock.js "$PWD/dist" 8787   # 模拟 Komari API + WebSocket（
 python3 tools/bump.py 1.4.1        # 同步 komari-theme.json 版本与资源 ?v= 版本号
 # 在 CHANGELOG.md 顶部写上 ## 1.4.1 的更新内容
 git commit -am "release: v1.4.1"
-git tag v1.4.1 && git push --follow-tags
+git push                            # main 上出现新版本号 → 自动打标签 v1.4.1 并发布 Release
 ```
 
-推送 `v*` 标签后，GitHub Actions（`.github/workflows/release.yml`）会校验版本号、打包 `Komari-Theme-Horizon-v1.4.1.zip` 并发布 Release，更新说明取自 CHANGELOG 对应段落。本地打包：`bash tools/package.sh`。
+GitHub Actions（`.github/workflows/release.yml`）在 `main` 的 `komari-theme.json` 版本号变化时运行：校验版本号与资源 `?v=` 一致，打包 `Komari-Theme-Horizon-v1.4.1.zip`，创建标签与 Release，更新说明取自 CHANGELOG 对应段落。已发布过的版本会跳过；自己推送 `v*` 标签也能触发。本地打包：`bash tools/package.sh`。
 
 ## 致谢
 
