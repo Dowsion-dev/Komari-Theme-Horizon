@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve version
         id: v
@@ -38,6 +40,17 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Keep an existing release tag on main
+        if: steps.v.outputs.skip == 'true'
+        run: |
+          # if history was rewritten, move the release tag onto the current main commit (same version, same theme files)
+          TAG="${{ steps.v.outputs.tag }}"
+          git fetch --tags --force origin
+          if ! git merge-base --is-ancestor "$(git rev-list -n1 "$TAG")" HEAD; then
+            git tag -f "$TAG" HEAD && git push -f origin "refs/tags/$TAG"
+            echo "Moved $TAG to $(git rev-parse --short HEAD)"
+          fi
 
       - name: Package theme
         if: steps.v.outputs.skip != 'true'
