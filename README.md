@@ -124,7 +124,6 @@ ADMIN=1 node tools/mock.js "$PWD/dist" 8787   # 模拟 Komari API + WebSocket（
 
 - 布局参考 [https://gut.qzz.io](https://gut.qzz.io/)
 - 主题设置页参考 [Komari-Theme-LuminaPlus](https://github.com/shanyang242/Komari-Theme-LuminaPlus)
-- 丢包虚线思路来自 [LuminaPlus-Dowsion-Modified](https://github.com/Dowsion-dev/LuminaPlus-Dowsion-Modified)
 - 图标、国旗与字体见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## 许可
