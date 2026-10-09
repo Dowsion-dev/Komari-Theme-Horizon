@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, e.g. v1.4.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          MANIFEST=$(python3 -c "import json;print(json.load(open('komari-theme.json'))['version'])")
+          if [ "$MANIFEST" != "$VERSION" ]; then
+            echo "::error::Tag $TAG does not match komari-theme.json version $MANIFEST (run tools/bump.py first)"; exit 1
+          fi
+          grep -q "?v=$VERSION\"" dist/index.html || { echo "::error::dist/index.html asset ?v= is not $VERSION (run tools/bump.py)"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package theme
+        run: bash tools/package.sh
+
+      - name: Release notes from CHANGELOG
+        run: |
+          python3 - <<'PY' > notes.md
+          import re
+          v = "${{ steps.v.outputs.version }}"
+          text = open('CHANGELOG.md', encoding='utf-8').read()
+          m = re.search(r'^## ' + re.escape(v) + r'\s*\n(.*?)(?=^## |\Z)', text, re.S | re.M)
+          body = m.group(1).strip() if m else 'See CHANGELOG.md'
+          print(body)
+          print()
+          print('**安装**：Komari 后台 → 设置 → 主题 → 上传 `Komari-Theme-Horizon-v%s.zip`' % v)
+          PY
+          cat notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.v.outputs.tag }}"
+          ZIP="Komari-Theme-Horizon-${TAG}.zip"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP" --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" "$ZIP" --title "Horizon $TAG" --notes-file notes.md
+          fi

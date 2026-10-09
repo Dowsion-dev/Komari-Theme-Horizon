@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A simple server monitor tool." />
+    <title>Komari Monitor</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem('komari-horizon-scheme') || 'system';
+          var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.className = dark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.className = 'light';
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/assets/app.css?v=1.4.0" />
+    <script src="/assets/icons.js?v=1.4.0" defer></script>
+    <script src="/assets/app.js?v=1.4.0" defer></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

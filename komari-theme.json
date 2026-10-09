@@ -1,0 +1,12 @@
+{
+  "name": "Horizon",
+  "short": "horizon",
+  "description": {
+    "zh_CN": "Horizon：高密度控制台风格的 Komari 主题。集群总览、筛选与排序、节点卡片、流量周期与校准、延迟探针与丢包虚线、历史图表；登录后点首页齿轮进入主题设置。",
+    "en_US": "Horizon: a dense console-style Komari theme — cluster overview, filters & sorting, node cards, traffic cycles & calibration, latency probes with packet-loss lines, history charts. Theme settings: gear button on the homepage when logged in."
+  },
+  "author": "Dowsion",
+  "version": "1.4.0",
+  "url": "https://github.com/Dowsion-dev/Komari-Theme-Horizon",
+  "preview": "preview.png"
+}
