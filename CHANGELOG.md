@@ -2,7 +2,7 @@
 
 ## 1.4.0
 
-- 主题更名为 **Horizon**（标识 `horizon`）。从 Copycat Console 升级请先在旧主题设置页导出 JSON，再在 Horizon 中导入（见 README）
+- 主题定名为 **Horizon**（标识 `horizon`）
 - 加入 GitHub Actions：main 上版本号更新后自动打标签、打包并发布 Release
 - 评级标签（Burst / Massive / Whale 等）移到数值下方，手机上不再压住数字
 - 实时刷新只更新变化的数据并由主题自行保持滚动位置，修复 iOS Safari 页面每 2 秒自动下滑
