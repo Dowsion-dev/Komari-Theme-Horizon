@@ -721,6 +721,10 @@ select.m-input { cursor: pointer; }
 .mini .quota .quota-pct.warm { color: var(--t-amber); }
 .mini .quota .quota-pct.hot { color: var(--t-red); }
 .mini.has-quota .mini-rows { gap: 2px; }
+/* unmetered traffic: full emerald bar with soft stripes, label "used / ∞" (desktop only) */
+.g-inf { background-image: repeating-linear-gradient(-45deg, rgb(255 255 255 / .28) 0 4px, transparent 4px 8px), linear-gradient(to right, var(--emerald-500), var(--teal-500)); opacity: .75; }
+.mini .quota-inf .quota-pct { color: var(--t-emerald); }
+@media (max-width: 720px) { .mini .quota-inf { display: none; } }
 
 /* v1.3.2 — mini blocks adapt to their own width (phones: two narrow columns) */
 .mini { container-type: inline-size; }

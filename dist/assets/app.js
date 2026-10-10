@@ -1044,6 +1044,11 @@
       quota = '<div class="quota" title="' + esc(bytesPrecise(usedBytes) + ' / ' + bytesTotal(limit) + ' · ' + billTitle(billType)) + '">' +
         '<div class="bar"><div class="' + (rawPct >= 90 ? 'g-red' : rawPct >= 70 ? 'g-amber' : 'g-blue') + '" style="width:' + usedPct + '%"></div></div>' +
         '<span class="quota-pct' + (rawPct >= 90 ? ' hot' : rawPct >= 70 ? ' warm' : '') + '">' + pctTxt + '</span></div>';
+    } else {
+      // unmetered: a full, softly striped bar and "used / ∞" (desktop only, see .quota-inf in app.css)
+      quota = '<div class="quota quota-inf" title="' + esc(_t('Unmetered traffic', '不限流量') + ' · ' + bytesPrecise(usedBytes)) + '">' +
+        '<div class="bar"><div class="g-inf" style="width:100%"></div></div>' +
+        '<span class="quota-pct">' + bytesPrecise(usedBytes) + ' / ∞</span></div>';
     }
     var resetChip = T.showResetCountdown && tr.cyc ? '<span class="chip" title="' + esc(resetTitle(tr)) + '">' + icon('rotate-ccw') + (tr.cyc.daysLeft === 0 ? _t('Today', '今天') : tr.cyc.daysLeft + 'd') + '</span>' : '';
     var h = '<div><div class="node-head monitor-divider"><div class="node-head-row"><div class="node-ident">' +
@@ -1611,7 +1616,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.5.2';
+    sc.src = '/assets/manage.js?v=1.5.3';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
