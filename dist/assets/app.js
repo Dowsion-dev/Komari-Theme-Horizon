@@ -243,7 +243,7 @@
     costIgnoredNodes: [], expiryWarningDays: 30,
     // 08 latency
     showProbes: true, probeCount: 3, cardProbeTaskIds: [], cardProbeNodeTaskIds: {}, latencyGoodMs: 150, latencyWarnMs: 400,
-    showLossLines: true, lossMarkerStyle: 'line', lossLineOpacity: 75, connectGapsDefault: false,
+    showLossLines: true, lossMarkerStyle: 'line', lossLineOpacity: 75, connectGapsDefault: false, smoothProbesDefault: false,
     // 09 advanced
     refreshIntervalMs: 2000
   };
@@ -627,6 +627,8 @@
     if (rr && S.modal) { setHistoryRange(Number(rr.dataset.range)); return; }
     var pr = t.closest('[data-prange]');
     if (pr && S.modal) { setProbeRange(Number(pr.dataset.prange)); return; }
+    var pm = t.closest('[data-pmode]');
+    if (pm && S.modal) { S.modal.pmode = pm.dataset.pmode; S.modal.phover = null; renderProbeChart(); return; }
     var pt = t.closest('[data-ptoggle]');
     if (pt && S.modal) { var key = pt.dataset.ptoggle; S.modal[key] = !S.modal[key]; renderProbeChart(); return; }
     var ps = t.closest('[data-series]');
@@ -1015,26 +1017,54 @@
     return list.slice(0, T.probeCount);
   }
 
+  // last hour of a task in 20 buckets of 3 minutes (aligned to the clock so they don't shift on every refresh)
+  var PB_N = 20, PB_SPAN = 3 * 60e3;
+  function probeWindow(recs) {
+    var end = Math.ceil(Date.now() / PB_SPAN) * PB_SPAN, start = end - PB_N * PB_SPAN, b = [], total = 0, lost = 0, last = null;
+    for (var i = 0; i < PB_N; i++) b.push({ t: start + i * PB_SPAN, sum: 0, n: 0, lost: 0 });
+    (recs || []).forEach(function (r) {
+      if (r.t < start || r.t >= end) return;
+      var k = b[Math.floor((r.t - start) / PB_SPAN)];
+      total++;
+      if (r.v < 0) { k.lost++; lost++; } else { k.sum += r.v; k.n++; }
+      last = r.v;
+    });
+    b.forEach(function (k) { var c = k.n + k.lost; k.avg = k.n ? k.sum / k.n : c ? -1 : null; k.loss = c ? k.lost / c : 0; });
+    return { buckets: b, total: total, lost: lost, loss: total ? lost / total * 100 : null, last: last };
+  }
+  function lossClass(p) { return p == null ? 'lat-none' : p < 1 ? 'lat-good' : p < 5 ? 'lat-mid' : 'lat-bad'; }
+  function fmtLoss(p) { return p == null ? '—' : (p >= 10 ? Math.round(p) : (Math.round(p * 10) / 10).toFixed(1)) + '%'; }
+  function fmtMs(v) { return v == null ? '—' : v < 0 ? _t('Loss', '丢包') : (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + ' ms'; }
+  function hm(t) { var d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
   function probeSummary(n) {
     if (!S.T.showProbes) return '';
     var list = cardTasksFor(n.uuid), data = S.pings[n.uuid] || {};
     if (!list.length) return '';
     return '<section class="probe-summary" aria-label="' + _t('Network probes', '网络探测') + '"><div class="probe-grid" style="grid-template-columns:repeat(' + Math.max(3, list.length) + ',minmax(0,1fr))">' + list.map(function (t) {
-      var recs = (data[t.id] || []).slice(-10);
-      var last = recs.length ? recs[recs.length - 1].v : null;
-      var fails = recs.filter(function (r) { return r.v < 0; }).length;
-      var bars = '';
-      for (var i = 0; i < 10; i++) {
-        var r = recs[i - (10 - recs.length)];
-        bars += r ? '<span class="' + barClass(r.v) + '" title="' + (r.v < 0 ? _t('Packet loss', '丢包') : r.v + ' ms') + '"></span>' : '<span></span>';
-      }
+      var w = probeWindow(data[t.id]);
+      var bars = w.buckets.map(function (k) {
+        var cls = k.avg == null ? '' : k.avg < 0 || k.loss >= 0.5 ? 'bad' : barClass(k.avg);
+        var tip = hm(k.t) + '–' + hm(k.t + PB_SPAN) + ' · ' + (k.avg == null ? _t('no data', '无数据') : k.avg < 0 ? _t('all lost', '全部丢包') : fmtMs(k.avg) + (k.lost ? ' · ' + _t('loss ', '丢包 ') + fmtLoss(k.loss * 100) : ''));
+        return '<span class="' + cls + '" title="' + tip + '"></span>';
+      }).join('');
       return '<div class="probe-card monitor-surface-secondary">' +
         '<div class="probe-top"><span class="probe-name">' + esc(t.name) + '</span><span class="probe-type">' + esc(t.type || 'icmp') + '</span></div>' +
-        '<div class="probe-stats"><div><span class="k">' + _t('Latency', '延迟') + '</span><span class="lat ' + latClass(last) + '">' + (last == null ? '—' : last < 0 ? _t('Loss', '丢包') : last + ' ms') + '</span></div>' +
-        '<div><span class="k">' + _t('Failures', '失败') + '</span><span class="fail">' + fails + ' / ' + recs.length + '</span></div></div>' +
-        '<div class="probe-bars monitor-divider" aria-label="' + _t('Last ' + recs.length + ' checks: ' + fails + ' failed', '最近 ' + recs.length + ' 次检测：' + fails + ' 次失败') + '">' + bars + '</div>' +
+        '<div class="probe-stats"><div><span class="k">' + _t('Latency', '延迟') + '</span><span class="lat ' + latClass(w.last) + '">' + fmtMs(w.last) + '</span></div>' +
+        '<div><span class="k">' + _t('Loss', '丢包率') + '</span><span class="fail ' + lossClass(w.loss) + '">' + fmtLoss(w.loss) + '</span></div></div>' +
+        '<div class="probe-bars monitor-divider" aria-label="' + _t('Last hour in 3-minute averages, loss ', '最近 1 小时（每格 3 分钟平均），丢包率 ') + fmtLoss(w.loss) + '">' + bars + '</div>' +
       '</div>';
     }).join('') + '</div></section>';
+  }
+  // compact cards: one line per probe task — name, latest latency, loss over the last hour
+  function compactProbes(n) {
+    if (!S.T.showProbes) return '';
+    var list = cardTasksFor(n.uuid), data = S.pings[n.uuid] || {};
+    if (!list.length) return '';
+    return '<div class="cm-probes">' + list.map(function (t) {
+      var w = probeWindow(data[t.id]);
+      return '<span class="cp" title="' + esc(t.name) + ' · ' + _t('latest latency / loss in the last hour', '最新延迟 / 最近 1 小时丢包率') + '"><b>' + esc(t.name) + '</b><i class="' + latClass(w.last) + '">' + fmtMs(w.last) + '</i><em class="' + lossClass(w.loss) + '">' + fmtLoss(w.loss) + '</em></span>';
+    }).join('') + '</div>';
   }
 
   function nodeView(n) {
@@ -1147,9 +1177,11 @@
       (V.group ? '<span class="node-provider-sep" aria-hidden="true">·</span><span class="node-provider">' + esc(V.group) + '</span>' : '') + '</h3></div>' +
       (T.compactShowUptime ? '<span class="chip">' + icon(V.on ? 'clock' : 'cloud-off') + (V.on ? uptime(V.r.uptime) : _t('Offline', '离线')) + '</span>' : '') + '</div>' +
       '<div class="cm-grid">' + meter('CPU', V.cpu, 'g-blue') + meter(_t('MEM', '内存'), pct(V.memU, V.memT), 'g-emerald') + meter(_t('DISK', '硬盘'), pct(V.diskU, V.diskT), 'g-amber') + '</div>' +
-      '<div class="cm-net"><span class="rx">' + icon('arrow-down') + speed(net.down) + '</span><span class="tx">' + icon('arrow-up') + speed(net.up) + '</span>' +
+      compactProbes(n) +
+      '<div class="cm-net"><div class="cm-line"><span class="rx">' + icon('arrow-down') + speed(net.down) + '</span><span class="tx">' + icon('arrow-up') + speed(net.up) + '</span></div>' +
+      (T.compactShowTrafficTotal || T.showConnections ? '<div class="cm-line">' : '') +
       (T.compactShowTrafficTotal ? (function () { var tr = trafficOf(n), lim = num(n.traffic_limit); var bt = lim > 0 ? String(n.traffic_limit_type || 'max').toLowerCase() : 'sum'; return '<span class="muted" title="' + esc(resetTitle(tr)) + '">' + (BILL_LABEL[bt] ? BILL_LABEL[bt][0] : 'MAX') + ' ' + (tr.approx || tr.pending ? '≈' : '') + bytesPrecise(trafficUsedBy(bt, tr)) + (lim > 0 ? ' / ' + bytesTotal(lim) + ' · ' + Math.round(pct(trafficUsedBy(bt, tr), lim)) + '%' : '') + (T.showResetCountdown && tr.cyc ? ' · ↻' + tr.cyc.daysLeft + 'd' : '') + '</span>'; })() : '') +
-      (T.showConnections ? '<span class="muted">' + num(V.conn.tcp) + 'T · ' + num(V.conn.udp) + 'U</span>' : '') + '</div></div>';
+      (T.showConnections ? '<span class="muted">' + num(V.conn.tcp) + 'T · ' + num(V.conn.udp) + 'U</span>' : '') + (T.compactShowTrafficTotal || T.showConnections ? '</div>' : '') + '</div></div>';
     return h + footerHTML(n, { noTags: true, noBilling: !T.compactShowBilling });
   }
 
@@ -1327,7 +1359,7 @@
   function openModal(uuid) {
     var n = S.byId[uuid]; if (!n) return;
     S.modal = { uuid: uuid, metric: 'cpu', range: 1, prange: 1, records: null, probe: null, hover: null, phover: null, hiddenSeries: {}, loading: true,
-      lossLines: S.T.showLossLines, connectGaps: S.T.connectGapsDefault };
+      lossLines: S.T.showLossLines, connectGaps: S.T.connectGapsDefault, smooth: S.T.smoothProbesDefault, pmode: 'latency' };
     var dlg = $('#modal');
     dlg.innerHTML =
       '<div class="modal-in"><header class="modal-head monitor-surface-primary" id="modal-head"></header>' +
@@ -1495,18 +1527,41 @@
     var uuid = m.uuid;
     api.ping(uuid, h).then(function (res) {
       if (!S.modal || S.modal.uuid !== uuid || S.modal.prange !== h) return;
-      var by = {}, loss = {};
+      var raw = {}, loss = {}, stats = {}, lossSeries = {};
       (res && res.records || []).forEach(function (r) {
         var t = new Date(r.time).getTime();
-        (by[r.task_id] = by[r.task_id] || []).push({ t: t, v: r.value });
+        (raw[r.task_id] = raw[r.task_id] || []).push({ t: t, v: r.value });
         // loss markers come from the raw samples, independent of the latency downsampling
         if (r.value < 0) (loss[r.task_id] = loss[r.task_id] || []).push(t);
       });
-      Object.keys(by).forEach(function (k) { by[k].sort(function (a, b) { return a.t - b.t; }); by[k] = downsampleProbe(by[k], h > 24 ? 600 : 400); });
-      S.modal.probe = { by: by, loss: loss, tasks: (res && res.tasks) || [] };
+      // loss rate over time: the range cut into equal buckets
+      var nB = h <= 1 ? 30 : 48, end = Date.now(), span = h * 3600e3 / nB, start = end - h * 3600e3;
+      var by = {};
+      Object.keys(raw).forEach(function (k) {
+        var arr = raw[k].sort(function (x, y) { return x.t - y.t; }), lost = 0, last = null, bk = [];
+        for (var i = 0; i < nB; i++) bk.push({ n: 0, lost: 0 });
+        arr.forEach(function (p) {
+          if (p.v < 0) lost++; else last = p.v;
+          var j = Math.floor((p.t - start) / span); if (j < 0 || j >= nB) return;
+          bk[j].n++; if (p.v < 0) bk[j].lost++;
+        });
+        stats[k] = { total: arr.length, lost: lost, loss: arr.length ? lost / arr.length * 100 : null, last: last };
+        lossSeries[k] = bk.map(function (x, i) { return { t: start + (i + 0.5) * span, v: x.n ? x.lost / x.n * 100 : null }; });
+        by[k] = downsampleProbe(arr, h > 24 ? 600 : 400);
+      });
+      S.modal.probe = { by: by, loss: loss, stats: stats, lossSeries: lossSeries, tasks: (res && res.tasks) || [] };
       S.modal.ploading = false;
       renderProbeChart();
-    }).catch(function () { if (S.modal) { S.modal.probe = { by: {}, loss: {}, tasks: [] }; S.modal.ploading = false; renderProbeChart(); } });
+    }).catch(function () { if (S.modal) { S.modal.probe = { by: {}, loss: {}, stats: {}, lossSeries: {}, tasks: [] }; S.modal.ploading = false; renderProbeChart(); } });
+  }
+  // "peak shaving": rolling median over 5 successful samples; lost samples stay where they are
+  function smoothSeries(data) {
+    var ok = data.filter(function (p) { return p.v >= 0; }).map(function (p) { return p.v; }), j = 0;
+    return data.map(function (p) {
+      if (p.v < 0) return p;
+      var w = ok.slice(Math.max(0, j - 2), j + 3).slice().sort(function (x, y) { return x - y; }); j++;
+      return { t: p.t, v: w[Math.floor(w.length / 2)] };
+    });
   }
   function downsampleProbe(arr, max) {
     if (arr.length <= max) return arr;
@@ -1535,45 +1590,58 @@
   function renderProbeChart() {
     var m = S.modal; if (!m) return;
     var box = $('#probes'); if (!box) return;
-    var tasks = probeTaskList(), by = (m.probe && m.probe.by) || {}, lossBy = (m.probe && m.probe.loss) || {};
+    var P = m.probe || {}, tasks = probeTaskList(), lossMode = m.pmode === 'loss';
+    var by = P.by || {}, lossBy = P.loss || {}, stats = P.stats || {}, lossSeries = P.lossSeries || {};
+    var tg = function (key, label, title) { return '<button type="button" class="obtn' + (m[key] ? ' sel' : '') + '" data-ptoggle="' + key + '" aria-pressed="' + !!m[key] + '" title="' + title + '">' + label + '</button>'; };
     var html = '<div class="section-h"><h3 id="probe-h">' + _t('Latency Probes', '延迟探测') + '</h3><div class="probe-tools" role="group" aria-label="' + _t('Probe chart options', '延迟图选项') + '">' +
-      '<button type="button" class="obtn' + (m.lossLines ? ' sel' : '') + '" data-ptoggle="lossLines" aria-pressed="' + !!m.lossLines + '" title="' + _t('Draw a dashed vertical line at every lost probe, coloured by task', '在每次丢包处画一条与任务同色的竖向虚线') + '">' + _t('Loss lines', '丢包虚线') + '</button>' +
-      '<button type="button" class="obtn' + (m.connectGaps ? ' sel' : '') + '" data-ptoggle="connectGaps" aria-pressed="' + !!m.connectGaps + '" title="' + _t('Off: show breaks at outages / lost probes. On: bridge the gaps — loss lines are still drawn.', '关闭：如实显示中断 / 丢包断点；开启：跨过空缺连线，丢包虚线仍保留。') + '">' + _t('Connect gaps', '断点连线') + '</button>' +
+      '<div class="seg pmode" role="group" aria-label="' + _t('Chart', '图表') + '">' +
+        '<button type="button" data-pmode="latency" aria-pressed="' + !lossMode + '">' + _t('Latency', '延迟') + '</button>' +
+        '<button type="button" data-pmode="loss" aria-pressed="' + lossMode + '">' + _t('Loss rate', '丢包率') + '</button></div>' +
+      '<span class="probe-tools-sep" aria-hidden="true"></span>' +
+      (lossMode ? '' : tg('smooth', _t('Smooth peaks', '削峰平滑'), _t('Rolling median over 5 samples: hides single spikes', '5 点滑动中位数，削去孤立的尖峰'))) +
+      tg('connectGaps', _t('Connect gaps', '断点连线'), _t('Off: show breaks at outages / lost probes. On: bridge the gaps — loss lines are still drawn.', '关闭：如实显示中断 / 丢包断点；开启：跨过空缺连线，丢包虚线仍保留。')) +
+      (lossMode ? '' : tg('lossLines', _t('Loss lines', '丢包虚线'), _t('Draw a dashed vertical line at every lost probe, coloured by task', '在每次丢包处画一条与任务同色的竖向虚线'))) +
       '<span class="probe-tools-sep" aria-hidden="true"></span>' +
       RANGES.map(function (h) { return '<button type="button" class="obtn' + (m.prange === h[0] ? ' sel' : '') + '" data-prange="' + h[0] + '" aria-pressed="' + (m.prange === h[0]) + '">' + h[1] + '</button>'; }).join('') +
       '</div></div>';
     if (!tasks.length) { box.innerHTML = html + '<p class="log-empty monitor-surface-secondary">' + _t('No latency probes assigned to this node', '该节点没有分配延迟探测任务') + '</p>'; return; }
     html += '<div class="probe-panel monitor-surface-secondary"><div class="probe-series" role="group" aria-label="' + _t('Probe series', '探测任务') + '">' +
       tasks.map(function (t, i) {
-        var hidden = !!m.hiddenSeries[t.id], lc = (lossBy[t.id] || []).length;
-        return '<button type="button" class="obtn series" data-series="' + t.id + '" aria-label="' + esc(t.name) + '" aria-pressed="' + !hidden + '"><span class="n" style="color:' + SERIES_COLORS[i % SERIES_COLORS.length] + '">' + (i + 1) + '</span><span>' + esc(t.name) + '</span><span class="s">' + esc((t.type || 'icmp').toUpperCase()) + ' · ' + (t.interval ? t.interval + 's' : _t('Auto', '自动')) + (lc ? ' · <b class="loss-count">' + _t(lc + ' loss', '丢包 ' + lc) + '</b>' : '') + '</span></button>';
+        var hidden = !!m.hiddenSeries[t.id], st = stats[t.id] || {};
+        return '<button type="button" class="obtn series" data-series="' + t.id + '" aria-label="' + esc(t.name) + '" aria-pressed="' + !hidden + '" title="' + esc((t.type || 'icmp').toUpperCase() + ' · ' + (t.interval ? t.interval + 's' : _t('Auto', '自动')) + (st.total ? ' · ' + _t(st.lost + ' lost of ' + st.total, st.total + ' 次中丢包 ' + st.lost + ' 次') : '')) + '">' +
+          '<span class="sdot" style="background:' + SERIES_COLORS[i % SERIES_COLORS.length] + '"></span><span>' + esc(t.name) + '</span>' +
+          '<b class="sv ' + latClass(st.last) + '">' + (st.last == null ? '—' : (Math.round(st.last * 10) / 10).toFixed(1) + ' ms') + '</b>' +
+          '<span class="sl ' + lossClass(st.loss) + '">' + (st.loss == null ? '—' : (Math.round(st.loss * 10) / 10).toFixed(1) + '%') + '</span></button>';
       }).join('') + '</div>' +
       '<output class="probe-readout" id="probe-out"></output><div class="probe-chart-viewport" id="probe-vp"></div>' +
-      '<div class="probe-foot"><span id="probe-start"></span><span>' + _t('Raw checks · ', '原始检测 · ') + (m.lossLines && S.T.lossMarkerStyle !== 'cross' ? '┆ ' : '× ') + _t('Packet loss', '丢包') + _t(' · Hover or use arrow keys', ' · 悬停或使用方向键查看') + '</span><span id="probe-end"></span></div></div>';
+      '<div class="probe-foot"><span id="probe-start"></span><span>' + (lossMode ? _t('Loss rate per interval', '分段丢包率') : (m.smooth ? _t('Smoothed · ', '已削峰 · ') : _t('Raw checks · ', '原始检测 · ')) + (m.lossLines && S.T.lossMarkerStyle !== 'cross' ? '┆ ' : '× ') + _t('Packet loss', '丢包')) + _t(' · Hover or use arrow keys', ' · 悬停或使用方向键查看') + '</span><span id="probe-end"></span></div></div>';
     box.innerHTML = html;
 
     var vp = $('#probe-vp');
-    var series = tasks.map(function (t, i) { return { t: t, i: i, color: SERIES_COLORS[i % SERIES_COLORS.length], dash: SERIES_DASH[i % SERIES_DASH.length], data: by[t.id] || [], loss: lossBy[t.id] || [] }; })
-      .filter(function (s) { return !m.hiddenSeries[s.t.id]; });
+    var series = tasks.map(function (t, i) {
+      var data = lossMode ? (lossSeries[t.id] || []) : (by[t.id] || []);
+      if (!lossMode && m.smooth) data = smoothSeries(data);
+      return { t: t, i: i, color: SERIES_COLORS[i % SERIES_COLORS.length], dash: SERIES_DASH[i % SERIES_DASH.length], data: data, loss: lossBy[t.id] || [] };
+    }).filter(function (s) { return !m.hiddenSeries[s.t.id]; });
     var all = [];
-    series.forEach(function (s) { s.data.forEach(function (p) { all.push(p); }); });
+    series.forEach(function (s) { s.data.forEach(function (p) { if (p.v != null) all.push(p); }); });
     if (m.ploading && !all.length) { vp.innerHTML = '<div class="chart-empty" style="height:192px">' + _t('Loading probes…', '正在加载探测数据…') + '</div>'; return; }
     if (!all.length) { vp.innerHTML = '<div class="chart-empty" style="height:192px">' + _t('No probe samples for this range', '该时间范围内没有探测数据') + '</div>'; $('#probe-out').textContent = ''; return; }
 
     var t0 = Infinity, t1 = -Infinity, vmax = 0;
     all.forEach(function (p) { t0 = Math.min(t0, p.t); t1 = Math.max(t1, p.t); if (p.v > vmax) vmax = p.v; });
     if (t1 === t0) t1 = t0 + 1;
-    vmax = Math.max(1, Math.ceil(vmax));
+    vmax = lossMode ? Math.min(100, Math.max(5, Math.ceil(vmax / 5) * 5)) : Math.max(1, Math.ceil(vmax));
     var W = Math.max(320, Math.round(vp.clientWidth)), H = 190, L = 52, R = W - 12, T = 16, B = 166;
     var xs = function (t) { return L + (t - t0) / (t1 - t0) * (R - L); };
     var ys = function (v) { return B - clamp(v, 0, vmax) / vmax * (B - T); };
-    var style = S.T.lossMarkerStyle, showLines = m.lossLines && style !== 'cross', showCross = !m.lossLines || style !== 'line';
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" tabindex="0" aria-label="' + _t('Latency probe history in milliseconds. Use left and right arrows, Home or End to inspect samples.', '延迟探测历史（毫秒），可用左右方向键、Home 或 End 查看采样点。') + '" aria-describedby="probe-out" id="probe-svg">';
+    var style = S.T.lossMarkerStyle, showLines = !lossMode && m.lossLines && style !== 'cross', showCross = !lossMode && (!m.lossLines || style !== 'line');
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" tabindex="0" aria-label="' + (lossMode ? _t('Packet loss rate over time. Use left and right arrows to inspect.', '丢包率走势，可用左右方向键查看。') : _t('Latency probe history in milliseconds. Use left and right arrows, Home or End to inspect samples.', '延迟探测历史（毫秒），可用左右方向键、Home 或 End 查看采样点。')) + '" aria-describedby="probe-out" id="probe-svg">';
     for (var i = 0; i <= 4; i++) {
-      var y = B - (B - T) * i / 4;
-      s += '<g><line x1="' + L + '" x2="' + R + '" y1="' + y + '" y2="' + y + '" class="svg-grid"' + (i ? ' stroke-dasharray="3 3"' : '') + '/><text x="' + (L - 8) + '" y="' + (y + 3) + '" text-anchor="end" class="svg-label">' + Math.round(vmax * i / 4) + '</text></g>';
+      var y = B - (B - T) * i / 4, lab = vmax * i / 4;
+      s += '<g><line x1="' + L + '" x2="' + R + '" y1="' + y + '" y2="' + y + '" class="svg-grid"' + (i ? ' stroke-dasharray="3 3"' : '') + '/><text x="' + (L - 8) + '" y="' + (y + 3) + '" text-anchor="end" class="svg-label">' + (lossMode ? (lab % 1 ? lab.toFixed(1) : lab) + '%' : Math.round(lab)) + '</text></g>';
     }
-    s += '<text x="6" y="10" class="svg-label">ms</text>';
+    if (!lossMode) s += '<text x="6" y="10" class="svg-label">ms</text>';
 
     // packet-loss dashed lines: one column per pixel; tasks sharing a column interleave their dashes
     if (showLines) {
@@ -1602,6 +1670,7 @@
       var med = dts.length ? dts[Math.floor(dts.length / 2)] : 0, prevT = null;
       se.data.forEach(function (p) {
         var x = xs(p.t);
+        if (p.v == null) { if (!m.connectGaps) pen = false; return; } // loss-rate bucket without samples
         if (!m.connectGaps && prevT != null && med && p.t - prevT > med * 3) pen = false;
         prevT = p.t;
         if (p.v < 0) {
@@ -1626,6 +1695,7 @@
         var best = null, bd = Infinity;
         se.data.forEach(function (p) { var dd = Math.abs(p.t - t); if (dd < bd) { bd = dd; best = p; } });
         if (!best) return null;
+        if (lossMode) return esc(se.t.name) + ': ' + (best.v == null ? '—' : '<span class="' + lossClass(best.v) + '">' + (Math.round(best.v * 10) / 10).toFixed(1) + '%</span>');
         return esc(se.t.name) + ': ' + (best.v < 0 ? '<span class="lat-bad">' + _t('loss', '丢包') + '</span>' : (Math.round(best.v * 10) / 10).toFixed(1) + ' ms');
       }).filter(Boolean);
       return dateTime(new Date(t)) + ' · ' + parts.join(' · ');
@@ -1673,7 +1743,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.6.0';
+    sc.src = '/assets/manage.js?v=1.7.0';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
