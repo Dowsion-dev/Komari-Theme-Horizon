@@ -209,7 +209,7 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .connection .dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--emerald-500); }
 .connection.is-connecting .dot { background: var(--amber-500); animation: pulse 2s cubic-bezier(.4,0,.6,1) infinite; }
 .connection.is-offline .dot { background: var(--red-500); }
-.connection .label { font-weight: 500; color: var(--n800); }
+.connection .label { font-weight: 500; color: var(--n800); display: inline-block; min-width: 12ch; } /* same width in both languages */
 .dark .connection .label { color: var(--n200); }
 .connection .sep { color: var(--t-faint); }
 .connection .clock { font-variant-numeric: tabular-nums; color: var(--monitor-muted); }
@@ -232,6 +232,9 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 
 .control-room { display: flex; height: 36px; align-items: center; gap: 8px; white-space: nowrap; border-radius: 8px; background: var(--btn-solid-bg); padding: 0 14px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--btn-solid-text); transition: background-color .15s; }
 .control-room:hover { background: var(--btn-solid-hover); }
+/* fixed widths so switching 中 / EN never moves the header buttons */
+.control-room { min-width: 128px; justify-content: center; }
+@media (min-width: 1024px) { .color-scheme-toggle button { min-width: 80px; } }
 .control-room svg { width: 12px; height: 12px; transition: transform .15s; }
 .control-room:hover svg { transform: translateX(2px); }
 
@@ -800,3 +803,31 @@ html, body { overflow-anchor: none; }
 .public-stat-panel { display: flex; flex-direction: column; }
 .public-stat-panel .rating-tag { margin-top: auto; padding-top: 0; }
 .public-stat-panel .transfer-grid + .rating-tag, .public-stat-panel .remaining-cur + .rating-tag { margin-top: 8px; }
+
+/* v1.8 — combined live rate + cycle traffic block ("netbox") */
+.mini.netbox, .mini.workload { grid-column: 1 / -1; }
+.nb-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.nb-side { min-width: 0; }
+.nb-side + .nb-side { border-left: 1px dashed var(--monitor-border); padding-left: 16px; }
+.nb-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.nb-k { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; line-height: 15px; color: var(--monitor-muted); white-space: nowrap; }
+.nb-k svg { width: 11px; height: 11px; }
+.nb-side.tx .nb-top .nb-k { color: var(--t-blue); } .nb-side.rx .nb-top .nb-k { color: var(--t-emerald); }
+.nb-v { font-size: 20px; line-height: 26px; font-weight: 700; letter-spacing: -.03em; color: var(--t-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nb-v small { margin-left: 2px; font-size: 10px; font-weight: 500; letter-spacing: 0; color: var(--monitor-muted); }
+.nb-trail { margin: 4px 0 6px; display: flex; align-items: center; gap: 6px; }
+.nb-dots { flex: 1 1 auto; min-width: 0; height: 8px; display: flex; align-items: center; justify-content: space-between; }
+.nb-dots i { width: 3px; height: 3px; border-radius: 999px; background: var(--monitor-rail); }
+.nb-dots i.on { width: calc(3px + var(--k) * 4px); height: calc(3px + var(--k) * 4px); opacity: calc(.35 + var(--k) * .65); }
+.nb-side.tx .nb-dots i.on { background: var(--blue-500); } .nb-side.rx .nb-dots i.on { background: var(--emerald-500); }
+.nb-live { flex: none; font-size: 9px; line-height: 12px; color: var(--monitor-muted); }
+.nb-total { display: flex; align-items: center; justify-content: space-between; gap: 6px; border-top: 1px solid var(--monitor-border-nested); padding-top: 5px; }
+.nb-total b { font-size: 12px; font-weight: 600; color: var(--t-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mini.netbox .quota { margin-top: 8px; }
+@media (max-width: 720px) {
+  .mini.netbox .mini-head:has(.r.used) { flex-wrap: nowrap; }
+  .mini.netbox .mini-head .r.used { flex-basis: auto; margin-left: auto; }
+  .nb-cols { gap: 0 10px; }
+  .nb-side + .nb-side { padding-left: 10px; }
+  .nb-v { font-size: 17px; line-height: 22px; }
+}

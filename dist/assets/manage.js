@@ -190,7 +190,6 @@
         '<div class="m-list-h"><span>' + Z('跨视图设置', 'Both views') + '</span><small>' + Z('适用于标准卡片与小卡片。', 'Standard and compact cards.') + '</small></div>' +
         '<div class="m-grid2">' +
           toggle('showConnections', Z('显示连接数（TCP/UDP）', 'Show connections (TCP/UDP)'), Z('在标准卡片 Workload 中展示实时 TCP / UDP 连接数；关闭后改显示在线时长。', 'Live TCP / UDP counts in the Workload block of standard cards; when off, it shows uptime.')) +
-          toggle('showSwap', Z('显示 Swap 信息块', 'Show Swap block'), Z('关闭后标准卡片只保留网速、流量、负载三个信息块。', 'When off, standard cards keep net rate, traffic and workload only.')) +
         '</div>' +
         '<div class="m-list-h"><span>' + Z('小卡片专属', 'Compact cards') + '</span><small>' + Z('控制小卡片底栏的信息密度；实时速率始终显示。', 'Footer details; the live rate is always shown.') + '</small></div>' +
         '<div class="m-grid3">' +

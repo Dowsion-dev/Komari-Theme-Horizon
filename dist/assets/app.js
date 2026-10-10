@@ -350,7 +350,7 @@
     view: 'standard',
     scheme: 'system',
     rates: DEFAULT_RATES, ratesLive: false,
-    traffic: {}, trafficLoading: {},
+    traffic: {}, trafficLoading: {}, speedHist: {},
     modal: null,
     lang: 'en'
   };
@@ -511,7 +511,7 @@
               '</div>' +
               (T.showLanguageToggle ? langToggle() : '') +
               (S.me.logged_in ? '<a href="/?view=theme-manage" class="icon-btn monitor-control monitor-hover" title="' + _t('Theme settings', '主题设置') + '" aria-label="' + _t('Theme settings', '主题设置') + '">' + icon('settings') + '</a>' : '') +
-              (showAdmin ? '<a href="/admin" class="control-room" id="admin-link">' + (S.me.logged_in ? _t('Control Room', '控制台') : _t('Admin Login', '后台登录')) + icon('arrow-right') + '</a>' : '') +
+              (showAdmin ? '<a href="/admin" class="control-room" id="admin-link">' + (S.me.logged_in ? 'Admin Panel' : _t('Admin Login', '后台登录')) + icon('arrow-right') + '</a>' : '') +
             '</div>' +
           '</div>';
   }
@@ -1108,9 +1108,28 @@
     '</div>';
   }
   function mini(ic, cls, title, right, rows) {
-    return '<div class="mini monitor-surface-secondary"><div class="mini-head"><span class="t">' + icon(ic, cls) + ' ' + esc(title) + '</span>' + right + '</div><div class="mini-rows">' + rows + '</div></div>';
+    return '<div class="mini ' + (ic === 'boxes' ? 'workload ' : '') + 'monitor-surface-secondary"><div class="mini-head"><span class="t">' + icon(ic, cls) + ' ' + esc(title) + '</span>' + right + '</div><div class="mini-rows">' + rows + '</div></div>';
   }
   function miniRow(k, v, cls) { return '<div class="mini-row' + (cls ? ' ' + cls : '') + '">' + k + '<span class="v">' + v + '</span></div>'; }
+
+  // "7.95" + "KB/s": three significant digits, unit split off for the big live number
+  function speedParts(b) {
+    var r = scaleBytes(b), v = r[0];
+    return [r[1] === 'B' ? String(Math.round(v)) : v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : String(Math.round(v)), r[1] + '/s'];
+  }
+  // recent live rates as a row of dots: bigger / stronger = faster (relative to the visible window)
+  var TRAIL_N = 16;
+  function dotTrail(arr) {
+    var a = arr.slice(-TRAIL_N), max = 0, out = '';
+    a.forEach(function (v) { if (v > max) max = v; });
+    for (var i = 0; i < TRAIL_N; i++) {
+      var v = a[i - (TRAIL_N - a.length)];
+      if (v == null) { out += '<i></i>'; continue; }
+      var k = max > 0 ? v / max : 0;
+      out += '<i class="on" style="--k:' + k.toFixed(2) + '"></i>';
+    }
+    return '<span class="nb-dots" aria-hidden="true">' + out + '</span>';
+  }
 
   function resetTitle(tr) {
     var parts = [];
@@ -1153,14 +1172,22 @@
         '<span class="chip" aria-label="' + _t('Uptime', '在线时长') + '">' + icon(V.on ? 'clock' : 'cloud-off') + (V.on ? uptime(V.r.uptime) : _t('Offline', '离线')) + '</span>' + resetChip +
       '</div></div>';
     h += resList(n, V);
+    // live rate + cycle traffic in one block: upload | download, each with a dot trail of recent rates and its cycle total
+    var hist = S.speedHist[n.uuid] || { up: [], down: [] };
+    var side = function (dir) {
+      var up = dir === 'up', p = speedParts(up ? net.up : net.down);
+      return '<div class="nb-side ' + (up ? 'tx' : 'rx') + '">' +
+        '<div class="nb-top"><span class="nb-k">' + icon(up ? 'arrow-up' : 'arrow-down') + (up ? _t('Upload', '上行') : _t('Download', '下行')) + '</span>' +
+          '<span class="nb-v">' + p[0] + '<small>' + p[1] + '</small></span></div>' +
+        '<div class="nb-trail">' + dotTrail(up ? hist.up : hist.down) + '<span class="nb-live">' + _t('live', '实时') + '</span></div>' +
+        '<div class="nb-total"><span class="nb-k">' + icon('globe') + (up ? _t('Out', '出站') : _t('In', '入站')) + '</span><b>' + ax + bytesPrecise(up ? tr.up : tr.down) + '</b></div>' +
+      '</div>';
+    };
     var minis = [
-      mini('activity', 'c-blue', _t('Net Rate', '网速'), '<span class="r">' + _t('REALTIME', '实时') + '</span>',
-        miniRow('<span class="k rx">' + icon('arrow-down') + ' RX</span>', speed(net.down)) + miniRow('<span class="k tx">' + icon('arrow-up') + ' TX</span>', speed(net.up))),
-      mini('network', 'c-indigo', trafficTitle, trafficRight,
-        miniRow('<span class="k">' + _t('Total In', '入站') + '</span>', ax + bytesPrecise(tr.down)) + miniRow('<span class="k">' + _t('Total Out', '出站') + '</span>', ax + bytesPrecise(tr.up)) + quota)
+      '<div class="mini netbox monitor-surface-secondary' + (quota ? ' has-quota' : '') + '"><div class="mini-head"><span class="t">' + icon('network', 'c-indigo') + ' ' + esc(trafficTitle) + '</span>' + trafficRight + '</div>' +
+        '<div class="nb-cols">' + side('up') + side('down') + '</div>' + quota + '</div>'
     ];
-    if (T.showSwap) minis.push(mini('hard-drive', 'c-amber', 'Swap', '<span class="r">' + (V.swapT > 0 ? fmtPct(pct(V.swapU, V.swapT)) : 'OFF') + '</span>',
-      miniRow('<span class="k">' + _t('Used', '已用') + '</span>', V.swapT > 0 ? bytesPrecise(V.swapU) : '—') + miniRow('<span class="k">' + _t('Total', '总量') + '</span>', V.swapT > 0 ? bytesTotal(V.swapT) : _t('Disabled', '未启用'))));
+    // Swap was dropped in v1.8; Workload spans the full card width
     minis.push(mini('boxes', 'c-purple', _t('Workload', '负载'), '<span class="pill">' + num(V.r.process) + _t(' Procs', ' 进程') + '</span>',
       miniRow('<span class="k" title="' + _t('Load average 1m · 5m · 15m', '平均负载 1 / 5 / 15 分钟') + '">' + _t('Load', '负载') + '</span>', [V.load.load1, V.load.load5, V.load.load15].map(function (x) { return '<b>' + num(x).toFixed(2) + '</b>'; }).join('<i class="sep">·</i>'), 'wl') +
       (T.showConnections ? miniRow('<span class="k">' + _t('Sockets', '连接') + '</span>', '<b>' + num(V.conn.tcp) + '<small>TCP</small></b><i class="sep">·</i><b>' + num(V.conn.udp) + '<small>UDP</small></b>', 'wl') : miniRow('<span class="k">' + _t('Uptime', '在线') + '</span>', V.on ? uptime(V.r.uptime) : '—'))));
@@ -1296,6 +1323,12 @@
       var online = {};
       (d.online || []).forEach(function (u) { online[u] = true; });
       S.online = online; S.live = d.data || {};
+      Object.keys(S.live).forEach(function (u) {
+        var nw = S.live[u] && S.live[u].network; if (!nw) return;
+        var h = S.speedHist[u] || (S.speedHist[u] = { up: [], down: [] });
+        h.up.push(num(nw.up)); h.down.push(num(nw.down));
+        if (h.up.length > TRAIL_N) { h.up.shift(); h.down.shift(); }
+      });
       renderAll();
     };
     ws.onclose = function () { clearInterval(wsTimer); setConn('offline'); scheduleReconnect(); };
@@ -1745,7 +1778,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.7.2';
+    sc.src = '/assets/manage.js?v=1.8.0';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
