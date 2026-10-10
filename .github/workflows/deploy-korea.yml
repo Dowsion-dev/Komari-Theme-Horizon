@@ -4,19 +4,6 @@ on:
   push:
     branches:
       - gh-pages
-
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:name: Deploy to Korea VPS
-
-on:
-  push:
-    branches:
-      - gh-pages
-
   workflow_dispatch:
 
 permissions:
@@ -30,30 +17,20 @@ jobs:
   deploy:
     name: Deploy Website
     runs-on: ubuntu-latest
-
     timeout-minutes: 10
 
     steps:
-      # ==========================================
-      # 1. 获取 GitHub Pages 发布文件
-      # ==========================================
       - name: Checkout published website
         uses: actions/checkout@v4
         with:
           ref: gh-pages
           persist-credentials: false
 
-      # ==========================================
-      # 2. 安装部署工具
-      # ==========================================
       - name: Install deployment tools
         run: |
           sudo apt-get update
           sudo apt-get install -y rsync openssh-client
 
-      # ==========================================
-      # 3. 配置 SSH
-      # ==========================================
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -84,9 +61,6 @@ jobs:
 
           echo "SSH configuration completed"
 
-      # ==========================================
-      # 4. 测试 SSH 连接
-      # ==========================================
       - name: Test SSH connection
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -109,8 +83,6 @@ jobs:
             exit 1
           fi
 
-          echo "Testing SSH connection..."
-
           ssh \
             -p "$VPS_PORT" \
             -i ~/.ssh/id_ed25519 \
@@ -123,14 +95,9 @@ jobs:
 
           echo "SSH connection successful"
 
-      # ==========================================
-      # 5. 检查网站构建文件
-      # ==========================================
       - name: Verify website files
         run: |
           set -euo pipefail
-
-          echo "Checking website files..."
 
           if [ ! -f index.html ]; then
             echo "::error::index.html not found in gh-pages branch"
@@ -139,9 +106,6 @@ jobs:
 
           echo "Website files verified"
 
-      # ==========================================
-      # 6. 部署网站到韩国 VPS
-      # ==========================================
       - name: Deploy website to Korea VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -151,8 +115,6 @@ jobs:
           set -euo pipefail
 
           VPS_PORT="${VPS_PORT:-22}"
-
-          echo "Starting deployment..."
 
           rsync -avz --delete \
             --exclude='.git/' \
@@ -166,9 +128,6 @@ jobs:
 
           echo "Website deployment completed"
 
-      # ==========================================
-      # 7. 验证服务器上的部署结果
-      # ==========================================
       - name: Verify deployment
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -190,212 +149,17 @@ jobs:
 
           echo "Deployment verification successful"
 
-      # ==========================================
-      # 8. 输出部署结果
-      # ==========================================
       - name: Deployment summary
         if: success()
         run: |
           echo "## Deployment Successful" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- Server: KR-CHUNCHEON-FREE" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Website: demos.dowsion.com" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Website: https://demos.dowsion.com" >> "$GITHUB_STEP_SUMMARY"
           echo "- Directory: /var/www/demo" >> "$GITHUB_STEP_SUMMARY"
           echo "- Source: gh-pages" >> "$GITHUB_STEP_SUMMARY"
           echo "- Status: Success" >> "$GITHUB_STEP_SUMMARY"
 
-      # ==========================================
-      # 9. 清理 SSH 私钥
-      # ==========================================
-      - name: Cleanup SSH credentials
-        if: always()
-        run: |
-          rm -f ~/.ssh/id_ed25519
-          rm -f ~/.ssh/known_hosts
-  group: deploy-korea
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    name: Deploy Website
-    runs-on: ubuntu-latest
-
-    timeout-minutes: 10
-
-    steps:
-      # ==========================================
-      # 1. 获取 GitHub Pages 发布文件
-      # ==========================================
-      - name: Checkout published website
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          persist-credentials: false
-
-      # ==========================================
-      # 2. 安装部署工具
-      # ==========================================
-      - name: Install deployment tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rsync openssh-client
-
-      # ==========================================
-      # 3. 配置 SSH
-      # ==========================================
-      - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          if [ -z "$SSH_KEY" ]; then
-            echo "::error::VPS_SSH_KEY is empty"
-            exit 1
-          fi
-
-          if [ -z "$KNOWN_HOSTS" ]; then
-            echo "::error::VPS_KNOWN_HOSTS is empty"
-            exit 1
-          fi
-
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-
-          chmod 600 ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/known_hosts
-
-          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
-
-          echo "SSH configuration completed"
-
-      # ==========================================
-      # 4. 测试 SSH 连接
-      # ==========================================
-      - name: Test SSH connection
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-        run: |
-          set -euo pipefail
-
-          VPS_PORT="${VPS_PORT:-22}"
-
-          if ! [[ "$VPS_PORT" =~ ^[0-9]+$ ]] ||
-             [ "$VPS_PORT" -lt 1 ] ||
-             [ "$VPS_PORT" -gt 65535 ]; then
-            echo "::error::Invalid SSH port"
-            exit 1
-          fi
-
-          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
-            echo "::error::VPS_HOST or VPS_USER is empty"
-            exit 1
-          fi
-
-          echo "Testing SSH connection..."
-
-          ssh \
-            -p "$VPS_PORT" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 \
-            "${VPS_USER}@${VPS_HOST}" \
-            "hostname && whoami && test -d /var/www/demo && test -w /var/www/demo"
-
-          echo "SSH connection successful"
-
-      # ==========================================
-      # 5. 检查网站构建文件
-      # ==========================================
-      - name: Verify website files
-        run: |
-          set -euo pipefail
-
-          echo "Checking website files..."
-
-          if [ ! -f index.html ]; then
-            echo "::error::index.html not found in gh-pages branch"
-            exit 1
-          fi
-
-          echo "Website files verified"
-
-      # ==========================================
-      # 6. 部署网站到韩国 VPS
-      # ==========================================
-      - name: Deploy website to Korea VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-        run: |
-          set -euo pipefail
-
-          VPS_PORT="${VPS_PORT:-22}"
-
-          echo "Starting deployment..."
-
-          rsync -avz --delete \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='CNAME' \
-            --exclude='.nojekyll' \
-            --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
-            -e "ssh -p ${VPS_PORT} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15" \
-            ./ \
-            "${VPS_USER}@${VPS_HOST}:/var/www/demo/"
-
-          echo "Website deployment completed"
-
-      # ==========================================
-      # 7. 验证服务器上的部署结果
-      # ==========================================
-      - name: Verify deployment
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-        run: |
-          set -euo pipefail
-
-          VPS_PORT="${VPS_PORT:-22}"
-
-          ssh \
-            -p "$VPS_PORT" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            "${VPS_USER}@${VPS_HOST}" \
-            "test -s /var/www/demo/index.html && ls -lah /var/www/demo | head -20"
-
-          echo "Deployment verification successful"
-
-      # ==========================================
-      # 8. 输出部署结果
-      # ==========================================
-      - name: Deployment summary
-        if: success()
-        run: |
-          echo "## Deployment Successful" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Server: KR-CHUNCHEON-FREE" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Website: demo.dowsion.com" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Directory: /var/www/demo" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Source: gh-pages" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Status: Success" >> "$GITHUB_STEP_SUMMARY"
-
-      # ==========================================
-      # 9. 清理 SSH 私钥
-      # ==========================================
       - name: Cleanup SSH credentials
         if: always()
         run: |
