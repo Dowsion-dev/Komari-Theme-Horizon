@@ -511,7 +511,7 @@
               '</div>' +
               (T.showLanguageToggle ? langToggle() : '') +
               (S.me.logged_in ? '<a href="/?view=theme-manage" class="icon-btn monitor-control monitor-hover" title="' + _t('Theme settings', '主题设置') + '" aria-label="' + _t('Theme settings', '主题设置') + '">' + icon('settings') + '</a>' : '') +
-              (showAdmin ? '<a href="/admin" class="control-room" id="admin-link">' + (S.me.logged_in ? 'Admin Panel' : _t('Admin Login', '后台登录')) + icon('arrow-right') + '</a>' : '') +
+              (showAdmin ? '<a href="/admin" class="control-room" id="admin-link">' + (S.me.logged_in ? _t('Admin Panel', '控制台') : _t('Admin Login', '后台登录')) + icon('arrow-right') + '</a>' : '') +
             '</div>' +
           '</div>';
   }
@@ -584,6 +584,23 @@
     raw = raw.replace(/\{year\}/g, String(new Date().getFullYear())).replace(/\{sitename\}/g, esc(S.settings.sitename || 'Komari')).replace(/\r?\n/g, '<br>');
     return sanitizeFooter(raw);
   }
+
+  // small floating tooltip for elements with data-tip (probe cells); native titles are too slow / tiny there
+  var tipEl = null, tipFor = null;
+  function showTip(el) {
+    if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'hz-tip'; tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl); }
+    tipFor = el; tipEl.textContent = el.getAttribute('data-tip'); tipEl.style.display = 'block';
+    var r = el.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    var x = clamp(r.left + r.width / 2 - w / 2, 8, innerWidth - w - 8), y = r.top - h - 8;
+    if (y < 8) y = r.bottom + 8;
+    tipEl.style.left = Math.round(x) + 'px'; tipEl.style.top = Math.round(y) + 'px';
+  }
+  function hideTip() { if (tipEl) tipEl.style.display = 'none'; tipFor = null; }
+  document.addEventListener('pointerover', function (e) {
+    var t = e.target.closest && e.target.closest('[data-tip]');
+    if (t) { if (t !== tipFor || !tipEl || tipEl.style.display === 'none') showTip(t); } else if (tipFor) hideTip();
+  });
+  window.addEventListener('scroll', hideTip, { passive: true });
 
   function bindEvents() {
     var root = $('#root');
@@ -1021,12 +1038,12 @@
   var PB_N = 20, PB_SPAN = 3 * 60e3;
   function probeWindow(recs) {
     var end = Math.ceil(Date.now() / PB_SPAN) * PB_SPAN, start = end - PB_N * PB_SPAN, b = [], total = 0, lost = 0, last = null;
-    for (var i = 0; i < PB_N; i++) b.push({ t: start + i * PB_SPAN, sum: 0, n: 0, lost: 0 });
+    for (var i = 0; i < PB_N; i++) b.push({ t: start + i * PB_SPAN, sum: 0, n: 0, lost: 0, min: Infinity, max: -Infinity });
     (recs || []).forEach(function (r) {
       if (r.t < start || r.t >= end) return;
       var k = b[Math.floor((r.t - start) / PB_SPAN)];
       total++;
-      if (r.v < 0) { k.lost++; lost++; } else { k.sum += r.v; k.n++; }
+      if (r.v < 0) { k.lost++; lost++; } else { k.sum += r.v; k.n++; k.min = Math.min(k.min, r.v); k.max = Math.max(k.max, r.v); }
       last = r.v;
     });
     b.forEach(function (k) { var c = k.n + k.lost; k.avg = k.n ? k.sum / k.n : c ? -1 : null; k.loss = c ? k.lost / c : 0; });
@@ -1045,8 +1062,13 @@
       var w = probeWindow(data[t.id]);
       var bars = w.buckets.map(function (k) {
         var cls = k.avg == null ? '' : k.avg < 0 || k.loss >= 0.5 ? 'bad' : barClass(k.avg);
-        var tip = hm(k.t) + '–' + hm(k.t + PB_SPAN) + ' · ' + (k.avg == null ? _t('no data', '无数据') : k.avg < 0 ? _t('all lost', '全部丢包') : fmtMs(k.avg) + (k.lost ? ' · ' + _t('loss ', '丢包 ') + fmtLoss(k.loss * 100) : ''));
-        return '<span class="' + cls + '" title="' + tip + '"></span>';
+        var c = k.n + k.lost, tip = esc(t.name) + ' · ' + hm(k.t) + '–' + hm(k.t + PB_SPAN) + '\n';
+        if (!c) tip += _t('No checks in this slot', '该时段没有检测数据');
+        else {
+          tip += k.n ? _t('Avg ', '平均 ') + fmtMs(k.avg) + (k.n > 1 ? _t('  (min ', '（最低 ') + fmtMs(k.min) + _t(' / max ', ' / 最高 ') + fmtMs(k.max) + _t(')', '）') : '') : _t('All checks lost', '全部丢包');
+          tip += '\n' + _t(c + ' checks · ' + k.lost + ' lost (' + fmtLoss(k.loss * 100) + ')', '检测 ' + c + ' 次 · 丢包 ' + k.lost + ' 次（' + fmtLoss(k.loss * 100) + '）');
+        }
+        return '<span class="' + cls + '" data-tip="' + tip + '"></span>';
       }).join('');
       return '<div class="probe-card monitor-surface-secondary">' +
         '<div class="probe-top"><span class="probe-name">' + esc(t.name) + '</span><span class="probe-type">' + esc(t.type || 'icmp') + '</span></div>' +
@@ -1107,28 +1129,23 @@
         '<div class="bar"><div class="g-amber" style="width:' + pct(V.diskU, V.diskT) + '%"></div></div></div>' +
     '</div>';
   }
-  // CPU / memory / disk / load as a 2×2 grid of tiles: value on the right, detail line, segmented bar
-  var SEG_N = 16;
-  function segBar(p, cls) {
-    var on = p > 0 ? Math.max(1, Math.round(clamp(p, 0, 100) / 100 * SEG_N)) : 0, out = '';
-    for (var i = 0; i < SEG_N; i++) out += '<i' + (i < on ? ' class="on"' : '') + '></i>';
-    return '<div class="seg-bar ' + cls + '" aria-hidden="true">' + out + '</div>';
-  }
+  // CPU / memory / disk / load as a 2×2 grid of tiles: value on the right, detail line, usage bar
   function loadPct(V) { return V.cores > 0 ? num(V.load.load1) / V.cores * 100 : num(V.load.load1) * 100; }
   function resTiles(n, V) {
     var T = S.T, l1 = num(V.load.load1);
     var tile = function (ic, label, value, unit, sub, subTitle, p, cls) {
       return '<div class="rt"><div class="rt-top"><span class="rt-k">' + icon(ic) + label + '</span><span class="rt-v">' + value + (unit ? '<small>' + unit + '</small>' : '') + '</span></div>' +
-        '<div class="rt-sub" title="' + esc(subTitle || '') + '">' + sub + '</div>' + segBar(p, cls) + '</div>';
+        '<div class="rt-sub" title="' + esc(subTitle || '') + '">' + sub + '</div>' +
+        '<div class="bar rt-bar"><div class="' + cls + '" style="width:' + clamp(p, 0, 100) + '%"></div></div></div>';
     };
     var pctNum = function (v) { return (Math.round(v * 100) / 100).toFixed(v >= 10 ? 1 : 2); };
     var memP = pct(V.memU, V.memT), diskP = pct(V.diskU, V.diskT);
     var loadSub = T.showConnections ? num(V.conn.tcp) + ' TCP · ' + num(V.conn.udp) + ' UDP' : '5m ' + num(V.load.load5).toFixed(2) + ' · 15m ' + num(V.load.load15).toFixed(2);
     return '<div class="res-tiles">' +
-      tile('cpu', 'CPU', pctNum(V.cpu), '%', (V.cores ? _t(V.cores + ' cores', V.cores + ' 核') : '') + (n.cpu_name ? ' · ' + esc(n.cpu_name) : ''), n.cpu_name, V.cpu, 's-cpu') +
-      tile('memory-stick', _t('Memory', '内存'), pctNum(memP), '%', bytesPrecise(V.memU) + ' / ' + bytesPrecise(V.memT), '', memP, 's-mem') +
-      tile('hard-drive', _t('Disk', '磁盘'), pctNum(diskP), '%', bytesPrecise(V.diskU) + ' / ' + bytesPrecise(V.diskT), '', diskP, 's-disk') +
-      tile('gauge', _t('Load', '负载'), l1.toFixed(2), '', loadSub, _t('Load average 1m · 5m · 15m: ', '平均负载 1 / 5 / 15 分钟：') + [l1, num(V.load.load5), num(V.load.load15)].map(function (x) { return x.toFixed(2); }).join(' · ') + ' · ' + num(V.r.process) + _t(' processes', ' 个进程'), loadPct(V), 's-load') +
+      tile('cpu', 'CPU', pctNum(V.cpu), '%', (V.cores ? _t(V.cores + ' cores', V.cores + ' 核') : '') + (n.cpu_name ? ' · ' + esc(n.cpu_name) : ''), n.cpu_name, V.cpu, 'g-blue') +
+      tile('memory-stick', _t('Memory', '内存'), pctNum(memP), '%', bytesPrecise(V.memU) + ' / ' + bytesPrecise(V.memT), '', memP, 'g-purple') +
+      tile('hard-drive', _t('Disk', '磁盘'), pctNum(diskP), '%', bytesPrecise(V.diskU) + ' / ' + bytesPrecise(V.diskT), '', diskP, 'g-amber') +
+      tile('gauge', _t('Load', '负载'), l1.toFixed(2), '', loadSub, _t('Load average 1m · 5m · 15m: ', '平均负载 1 / 5 / 15 分钟：') + [l1, num(V.load.load5), num(V.load.load15)].map(function (x) { return x.toFixed(2); }).join(' · ') + ' · ' + num(V.r.process) + _t(' processes', ' 个进程'), loadPct(V), 'g-pink') +
     '</div>';
   }
   function mini(ic, cls, title, right, rows) {
@@ -1271,7 +1288,31 @@
       var html = S.view === 'compact' ? compactHTML(n) : cardHTML(n);
       if (cardCache[n.uuid] !== html) { patchHTML(el, html); cardCache[n.uuid] = html; }
     });
+    fitProbeBars(grid);
   }
+  // the 20 probe cells get whole device pixels each (fitProbeBars picks cell + gap so the row stays full width);
+  // fractional widths made some cells look thicker than others
+  function fitProbeBars(root) {
+    var dpr = window.devicePixelRatio || 1, minGap = dpr >= 2 ? 3 : 2;
+    (root || document).querySelectorAll('.probe-bars').forEach(function (el) {
+      var W = Math.floor(el.getBoundingClientRect().width * dpr), cells = el.children, n = cells.length;
+      if (!W || n < 2) return;
+      // identical cell width in device pixels; the remainder is spread over the gaps (±1 device px, invisible)
+      var mg = minGap, c = Math.floor((W - (n - 1) * mg) / n);
+      while (c < 3 * Math.ceil(dpr / 2) && mg > 1) { mg--; c = Math.floor((W - (n - 1) * mg) / n); } // narrow cards: thinner gaps first
+      c = Math.max(1, c);
+      var G = W - n * c, base = Math.floor(G / (n - 1)), extra = G - base * (n - 1);
+      var key = W + ':' + c;
+      if (el._fit === key && cells[0].style.width) return;
+      el._fit = key;
+      for (var i = 0; i < n; i++) {
+        var g = i ? base + (Math.floor(i * extra / (n - 1)) - Math.floor((i - 1) * extra / (n - 1))) : 0;
+        cells[i].style.width = c / dpr + 'px';
+        cells[i].style.marginLeft = g / dpr + 'px';
+      }
+    });
+  }
+  window.addEventListener('resize', function () { fitProbeBars(); });
   function setHTML(el, html) { if (el && el._h !== html) { patchHTML(el, html); el._h = html; } }
 
   // Minimal DOM patcher: updates text / attributes in place and only replaces nodes whose shape changed.
@@ -1799,7 +1840,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.9.0';
+    sc.src = '/assets/manage.js?v=1.9.1';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);

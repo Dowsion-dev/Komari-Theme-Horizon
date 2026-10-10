@@ -24,7 +24,7 @@ REWRITES = {
         ('href="/"', 'href="./"'),
         ('href="/?view=theme-manage"', 'href="?view=theme-manage"'),
         ('href="/admin"', 'href="' + REPO + '" target="_blank" rel="noopener"'),
-        ("'Admin Panel' : _t('Admin Login', '后台登录')", "'GitHub' : 'GitHub'"),
+        ("_t('Admin Panel', '控制台') : _t('Admin Login', '后台登录')", "'GitHub' : 'GitHub'"),
         ("'/assets/manage.js", "'assets/manage.js"),
     ],
     'assets/manage.js': [
