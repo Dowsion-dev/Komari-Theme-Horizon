@@ -905,17 +905,19 @@
     balanceRegions(); balanceGroups();
   }
   function nodeCount(n) { return _t(n + ' node' + (n > 1 ? 's' : ''), n + ' 个节点'); }
-  // when the flag buttons need more than one row, spread them evenly (e.g. 9 → 5 + 4 instead of 8 + 1)
+  // flag buttons: rows are filled evenly (e.g. 9 → 5 + 4 instead of 8 + 1); on mobile they stretch
+  // into a grid that spans the whole row, flags centred
   function balanceRegions() {
     var grp = $('#filters .region-group'); if (!grp) return;
-    grp.style.maxWidth = '';
-    var btns = grp.children, n = btns.length; if (n < 2) return;
-    var avail = grp.parentNode.clientWidth, w = btns[0].offsetWidth, gap = parseFloat(getComputedStyle(grp).columnGap) || 6;
-    if (!avail || !w) return;
+    grp.style.maxWidth = ''; grp.style.removeProperty('--rcols'); grp.classList.add('is-measuring');
+    var btns = grp.children, n = btns.length, w = n ? btns[0].getBoundingClientRect().width : 0;
+    grp.classList.remove('is-measuring');
+    var avail = grp.parentNode.clientWidth, gap = parseFloat(getComputedStyle(grp).columnGap) || 6;
+    if (!n || !avail || !w) return;
     var perRow = Math.max(1, Math.floor((avail + gap) / (w + gap)));
-    if (n <= perRow) return;
     var rows = Math.ceil(n / perRow), even = Math.ceil(n / rows);
-    grp.style.maxWidth = (even * (w + gap) - gap + 0.5) + 'px';
+    if (isMobile()) { grp.style.setProperty('--rcols', String(even)); return; }
+    if (n > perRow) grp.style.maxWidth = (even * (w + gap) - gap + 0.5) + 'px';
   }
   // group buttons share one width (the widest label); on mobile they form an even grid across the row
   function balanceGroups() {
@@ -1609,7 +1611,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.5.1';
+    sc.src = '/assets/manage.js?v=1.5.2';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);

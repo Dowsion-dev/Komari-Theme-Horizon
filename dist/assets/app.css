@@ -530,6 +530,10 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
   .quick-filters > .filter-group { justify-content: flex-start; }
   .group-group { display: grid; flex: 1 1 100%; grid-template-columns: repeat(var(--gcols, 3), minmax(0, 1fr)); }
   .group-group .filter-btn { width: 100%; min-width: 0; }
+  .region-group { display: grid; flex: 1 1 100%; grid-template-columns: repeat(var(--rcols, 5), minmax(0, 1fr)); }
+  .region-group .filter-btn { width: 100%; }
+  .region-group.is-measuring { display: flex; }
+  .region-group.is-measuring .filter-btn { width: auto; }
   .group-group.is-measuring { display: flex; }
   .group-group.is-measuring .filter-btn { width: auto; }
   .sort-group { flex: 1 1 100%; }
