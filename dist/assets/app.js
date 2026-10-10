@@ -1061,9 +1061,12 @@
     if (!S.T.showProbes) return '';
     var list = cardTasksFor(n.uuid), data = S.pings[n.uuid] || {};
     if (!list.length) return '';
-    return '<div class="cm-probes">' + list.map(function (t) {
+    // all tasks on one line: short latency ("38ms") and loss ("0%", "1.7%") keep each cell narrow
+    var ms = function (v) { return v == null ? '—' : v < 0 ? _t('loss', '丢包') : Math.round(v) + 'ms'; };
+    var lp = function (p) { return p == null ? '—' : p === 0 ? '0%' : fmtLoss(p); };
+    return '<div class="cm-probes" style="grid-template-columns:repeat(' + list.length + ',minmax(0,1fr))">' + list.map(function (t) {
       var w = probeWindow(data[t.id]);
-      return '<span class="cp" title="' + esc(t.name) + ' · ' + _t('latest latency / loss in the last hour', '最新延迟 / 最近 1 小时丢包率') + '"><b>' + esc(t.name) + '</b><i class="' + latClass(w.last) + '">' + fmtMs(w.last) + '</i><em class="' + lossClass(w.loss) + '">' + fmtLoss(w.loss) + '</em></span>';
+      return '<span class="cp" title="' + esc(t.name + ' · ' + fmtMs(w.last) + ' · ' + _t('loss ', '丢包率 ') + fmtLoss(w.loss)) + '"><b>' + esc(t.name) + '</b><i class="' + latClass(w.last) + '">' + ms(w.last) + '</i><em class="' + lossClass(w.loss) + '">' + lp(w.loss) + '</em></span>';
     }).join('') + '</div>';
   }
 
@@ -1742,7 +1745,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.7.1';
+    sc.src = '/assets/manage.js?v=1.7.2';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);

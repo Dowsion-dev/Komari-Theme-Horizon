@@ -572,11 +572,11 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .cm-top { margin-bottom: 4px; display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; line-height: 14px; color: var(--monitor-muted); }
 .cm-top b { color: var(--t-body); font-weight: 700; }
 .cm .bar { height: 4px; }
-.cm-probes { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; font-family: var(--font-mono); font-size: 10px; line-height: 15px; font-variant-numeric: tabular-nums; }
-.cm-probes .cp { display: flex; min-width: 0; align-items: baseline; gap: 6px; }
+.cm-probes { margin-top: 10px; display: grid; gap: 4px 10px; font-family: var(--font-mono); font-size: 10px; line-height: 15px; font-variant-numeric: tabular-nums; }
+.cm-probes .cp { display: flex; min-width: 0; align-items: baseline; gap: 4px; white-space: nowrap; }
 .cm-probes .cp b { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--t-soft2); }
 .cm-probes .cp i { font-style: normal; font-weight: 700; }
-.cm-probes .cp em { font-style: normal; font-weight: 600; min-width: 3.6em; text-align: right; }
+.cm-probes .cp em { font-style: normal; font-weight: 600; }
 .cm-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .cm-net { margin-top: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--t-strong); font-weight: 600; }
 .cm-net span { display: inline-flex; align-items: center; gap: 3px; }
