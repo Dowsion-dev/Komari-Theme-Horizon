@@ -243,7 +243,7 @@
   var resetDays = {};
   NODES.forEach(function (d) { if (d.reset) resetDays[d.uuid] = d.reset; });
   var DEMO_SETTINGS = {
-    productLabel: 'DEMO', nodesTitle: 'Horizon Demo Fleet', defaultAppearance: 'system',
+    productLabel: 'DEMO', defaultAppearance: 'system', defaultLanguage: 'auto',
     groupSections: true, groupOrder: ['线路机', '落地机', '家宽'], showCardGroup: false,
     baseCurrency: 'CNY', expiryWarningDays: 30, showRemainingValue: true,
     cardProbeTaskIds: ['1', '2', '3'], probeCount: 3, latencyGoodMs: 150, latencyWarnMs: 250,
@@ -327,11 +327,13 @@
       '.hz-demo button{background:transparent;color:#a1a1aa;padding:5px 6px}.hz-demo button:hover{color:#fff}' +
       '@media (max-width:520px){.hz-demo .long{display:none}}';
     document.head.appendChild(css);
-    var el = document.createElement('div');
+    var el = document.createElement('div'), lang = '';
+    try { lang = localStorage.getItem('komari-horizon-lang') || ''; } catch (e) { /* ignore */ }
+    var zh = lang ? lang === 'zh' : /^zh/i.test(navigator.language || '');
     el.className = 'hz-demo';
-    el.innerHTML = '<span class="t"><b>演示站</b><span class="long"> · 数据为浏览器内模拟，设置只保存在本机</span></span>' +
-      (savedSettings() ? '<button type="button" data-reset title="恢复演示默认设置">恢复默认</button>' : '') +
-      '<a href="' + REPO + '" target="_blank" rel="noopener">GitHub</a><button type="button" data-close aria-label="关闭">✕</button>';
+    el.innerHTML = '<span class="t"><b>' + (zh ? '演示站' : 'Demo') + '</b><span class="long">' + (zh ? ' · 数据为浏览器内模拟，设置只保存在本机' : ' · simulated data; settings stay in this browser') + '</span></span>' +
+      (savedSettings() ? '<button type="button" data-reset>' + (zh ? '恢复默认' : 'Reset') + '</button>' : '') +
+      '<a href="' + REPO + '" target="_blank" rel="noopener">GitHub</a><button type="button" data-close aria-label="' + (zh ? '关闭' : 'Close') + '">✕</button>';
     el.addEventListener('click', function (e) {
       if (e.target.closest('[data-close]')) el.remove();
       if (e.target.closest('[data-reset]')) { try { localStorage.removeItem(SETTINGS_KEY); } catch (x) { /* ignore */ } location.reload(); }

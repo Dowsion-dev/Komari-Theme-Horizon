@@ -1,11 +1,10 @@
-@import "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap";
-
+/* fonts are loaded by index.html / app.js according to the theme settings (see fontPlan in app.js) */
 /* ------------------------------------------------------------------
    Horizon — Komari Monitor theme · design tokens
    ------------------------------------------------------------------ */
 :root {
-  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "PingFang SC", "Microsoft YaHei", monospace;
 
   --red-500: oklch(63.7% .237 25.331);
   --red-600: oklch(57.7% .245 27.325);
@@ -224,6 +223,12 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .dark .color-scheme-toggle button[aria-pressed="true"] { color: #fff; }
 .color-scheme-toggle button span { display: none; }
 @media (min-width: 1024px) { .color-scheme-toggle button span { display: inline; } }
+.lang-toggle { display: flex; height: 36px; flex-shrink: 0; align-items: center; gap: 1px; border-radius: 8px; border-width: 1px; border-style: solid; padding: 1px; background-color: var(--monitor-control); border-color: var(--monitor-border-nested); }
+.lang-toggle button { display: flex; height: 32px; min-width: 32px; align-items: center; justify-content: center; border-radius: 6px; padding: 0 7px; font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 600; color: var(--monitor-muted); transition: color .15s, background-color .15s; }
+.lang-toggle button:hover { background: rgb(255 255 255 / .7); color: var(--n900); }
+.dark .lang-toggle button:hover { background: var(--n800); color: #fff; }
+.lang-toggle button[aria-pressed="true"] { background-color: var(--monitor-selected); color: var(--n900); box-shadow: var(--shadow-xs); }
+.dark .lang-toggle button[aria-pressed="true"] { color: #fff; }
 
 .control-room { display: flex; height: 36px; align-items: center; gap: 8px; white-space: nowrap; border-radius: 8px; background: var(--btn-solid-bg); padding: 0 14px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--btn-solid-text); transition: background-color .15s; }
 .control-room:hover { background: var(--btn-solid-hover); }
@@ -566,7 +571,11 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .m-masthead p { max-width: 640px; margin-top: 4px; font-size: 13px; color: var(--monitor-muted); }
 .m-kicker { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--monitor-muted); }
 .m-kicker span { display: inline-flex; min-width: 22px; height: 18px; align-items: center; justify-content: center; border-radius: 4px; background: color-mix(in oklab, var(--blue-500) 12%, transparent); color: var(--t-blue); font-weight: 600; }
-.m-kicker.big { color: var(--t-blue); font-weight: 600; }
+.m-kicker.big { color: var(--t-blue); font-weight: 600; flex-wrap: wrap; }
+.m-lang { height: 28px; margin-left: 6px; text-transform: none; letter-spacing: 0; }
+.m-lang button { height: 24px; font-family: var(--font-sans); font-weight: 600; }
+.m-font-sample { margin-top: 10px; border-radius: 8px; border: 1px dashed var(--monitor-border); padding: 10px 12px; font-size: 15px; line-height: 22px; font-weight: 600; color: var(--t-strong); overflow-wrap: anywhere; }
+.m-font-sample.mono { font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
 .m-meta { display: flex; flex-wrap: wrap; gap: 8px; }
 .m-meta > div { min-width: 96px; border-radius: 8px; border: 1px solid var(--monitor-border); background: var(--monitor-surface-1); padding: 8px 12px; }
 .m-meta dt { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--monitor-muted); }

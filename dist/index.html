@@ -15,11 +15,24 @@
         } catch (e) {
           document.documentElement.className = 'light';
         }
+        // fonts chosen in the theme settings (cached by app.js), so text renders in the right face from the start
+        var f = null;
+        try { f = JSON.parse(localStorage.getItem('komari-horizon-font') || 'null'); } catch (e) { f = null; }
+        if (!f || !f.css) f = { css: ['https://fonts.googleapis.com/css2?display=swap&family=Plus+Jakarta+Sans:wght@400;500;600;700;800', 'https://fonts.googleapis.com/css2?display=swap&family=JetBrains+Mono:wght@400;500;600'] };
+        for (var i = 0; i < f.css.length; i++) {
+          var l = document.createElement('link');
+          l.rel = 'stylesheet'; l.href = f.css[i]; l.setAttribute('data-hz-font', '');
+          document.head.appendChild(l);
+        }
+        if (f.faces && f.faces.length) { var st = document.createElement('style'); st.id = 'hz-font-faces'; st.textContent = f.faces.join('\n'); document.head.appendChild(st); }
+        var rs = document.documentElement.style;
+        if (f.sans) rs.setProperty('--font-sans', f.sans);
+        if (f.mono) rs.setProperty('--font-mono', f.mono);
       })();
     </script>
-    <link rel="stylesheet" href="/assets/app.css?v=1.4.0" />
-    <script src="/assets/icons.js?v=1.4.0" defer></script>
-    <script src="/assets/app.js?v=1.4.0" defer></script>
+    <link rel="stylesheet" href="/assets/app.css?v=1.5.0" />
+    <script src="/assets/icons.js?v=1.5.0" defer></script>
+    <script src="/assets/app.js?v=1.5.0" defer></script>
   </head>
   <body>
     <div id="root"></div>

@@ -6,7 +6,7 @@
     "en_US": "Horizon: a dense console-style Komari theme — cluster overview, filters & sorting, node cards, traffic cycles & calibration, latency probes with packet-loss lines, history charts. Theme settings: gear button on the homepage when logged in."
   },
   "author": "Dowsion",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "url": "https://github.com/Dowsion-dev/Komari-Theme-Horizon",
   "preview": "preview.png"
 }
