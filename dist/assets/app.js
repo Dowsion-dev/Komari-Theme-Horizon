@@ -891,7 +891,7 @@
     }
     var gk = Object.keys(groups).sort(function (a, b) { return groupRank(a) - groupRank(b) || groups[b] - groups[a] || a.localeCompare(b); });
     if (gk.length > 0 && T.showGroupFilter) {
-      html += '<div class="filter-group" role="group" aria-label="' + _t('Group filters', '分组筛选') + '">' + gk.map(function (g) {
+      html += '<div class="filter-group group-group" role="group" aria-label="' + _t('Group filters', '分组筛选') + '">' + gk.map(function (g) {
         return '<button type="button" class="filter-btn" data-filter="group" data-value="' + esc(g) + '" aria-pressed="' + (S.filter.group === g) + '" aria-label="' + _t('Filter by group ', '筛选分组 ') + esc(g) + '" title="' + esc(g) + ' · ' + nodeCount(groups[g]) + '"><span>' + esc(g) + '</span></button>';
       }).join('') + '</div>';
     }
@@ -902,7 +902,7 @@
         '<button type="button" class="filter-btn" id="sort-dir" aria-label="' + _t('Sort direction', '排序方向') + '" title="' + (S.sort.dir === 'asc' ? _t('Ascending', '升序') : _t('Descending', '降序')) + '">' + icon(S.sort.dir === 'asc' ? 'arrow-up' : 'arrow-down') + '</button></div>';
     }
     setHTML(box, html);
-    balanceRegions();
+    balanceRegions(); balanceGroups();
   }
   function nodeCount(n) { return _t(n + ' node' + (n > 1 ? 's' : ''), n + ' 个节点'); }
   // when the flag buttons need more than one row, spread them evenly (e.g. 9 → 5 + 4 instead of 8 + 1)
@@ -917,7 +917,22 @@
     var rows = Math.ceil(n / perRow), even = Math.ceil(n / rows);
     grp.style.maxWidth = (even * (w + gap) - gap + 0.5) + 'px';
   }
-  window.addEventListener('resize', function () { balanceRegions(); });
+  // group buttons share one width (the widest label); on mobile they form an even grid across the row
+  function balanceGroups() {
+    var grp = $('#filters .group-group'); if (!grp) return;
+    grp.style.removeProperty('--gw'); grp.style.removeProperty('--gcols'); grp.classList.add('is-measuring');
+    var btns = grp.children, n = btns.length, w = 0;
+    for (var i = 0; i < n; i++) w = Math.max(w, btns[i].getBoundingClientRect().width);
+    grp.classList.remove('is-measuring');
+    if (!n || !w) return;
+    grp.style.setProperty('--gw', Math.ceil(w) + 'px');
+    if (!isMobile()) return;
+    var avail = grp.parentNode.clientWidth, gap = parseFloat(getComputedStyle(grp).columnGap) || 6;
+    var perRow = Math.max(1, Math.floor((avail + gap) / (w + gap)));
+    var rows = Math.ceil(n / perRow);
+    grp.style.setProperty('--gcols', String(Math.ceil(n / rows)));
+  }
+  window.addEventListener('resize', function () { balanceRegions(); balanceGroups(); });
 
   // ---------------------------------------------------------------
   // node cards
@@ -1594,7 +1609,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.5.0';
+    sc.src = '/assets/manage.js?v=1.5.1';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);

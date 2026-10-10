@@ -522,9 +522,21 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .view-toggle button:hover { color: var(--t-strong); }
 .view-toggle button[aria-pressed="true"] { background: var(--monitor-selected); color: var(--t-strong); box-shadow: var(--shadow-xs); }
 .sort-group { flex-wrap: nowrap; }
-.sort-select { gap: 6px; padding-right: 4px; cursor: pointer; }
+.sort-select { gap: 6px; padding-right: 4px; cursor: pointer; justify-content: center; }
+.group-group .filter-btn { min-width: var(--gw, 32px); }
+@media (max-width: 720px) {
+  /* mobile filter bar: every block starts at the left edge */
+  .quick-filters { justify-content: flex-start; }
+  .quick-filters > .filter-group { justify-content: flex-start; }
+  .group-group { display: grid; flex: 1 1 100%; grid-template-columns: repeat(var(--gcols, 3), minmax(0, 1fr)); }
+  .group-group .filter-btn { width: 100%; min-width: 0; }
+  .group-group.is-measuring { display: flex; }
+  .group-group.is-measuring .filter-btn { width: auto; }
+  .sort-group { flex: 1 1 100%; }
+  .sort-group .sort-select { flex: 1 1 auto; }
+}
 .sort-select svg, #sort-dir svg { width: 12px; height: 12px; }
-.sort-select select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit; padding-right: 4px; cursor: pointer; outline: none; }
+.sort-select select { text-align: center; text-align-last: center; appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit; padding-right: 4px; cursor: pointer; outline: none; }
 .sort-select select option { color: #111; }
 
 /* overview rating */
