@@ -584,7 +584,6 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .cm-net .rx svg { color: var(--t-emerald); } .cm-net .tx svg { color: var(--t-blue); }
 .cm-net .muted { font-weight: 400; color: var(--monitor-muted); }
 .node-grid.is-compact { gap: 12px; }
-@media (min-width: 1536px) { .node-grid.is-compact { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 
 /* probe chart tools + loss */
 .probe-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }

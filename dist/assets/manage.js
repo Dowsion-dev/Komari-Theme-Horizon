@@ -155,7 +155,7 @@
           toggle('showHomeOverview', Z('显示顶部总览', 'Show overview'), Z('展示集群状态、CPU、内存、硬盘、流量、速率与剩余价值。', 'Cluster status, CPU, memory, storage, traffic, throughput and remaining value.')) +
           toggle('showGroupFilter', Z('显示分组筛选', 'Show group filter'), Z('根据后台节点分组生成筛选按钮。', 'Filter buttons built from the node groups.')) +
           toggle('showRegionFilter', Z('显示地区筛选', 'Show region filter'), Z('按节点地区生成国旗筛选栏，点击某地区只看该地区节点；需要换行时每行数量自动均分。', 'Flag buttons per region; when they wrap, rows are balanced automatically.')) +
-          toggle('showCardGroup', Z('卡片显示分组', 'Show group on cards'), Z('关闭后卡片标题后不再显示分组名（不影响分组筛选栏）。', 'Group name after the card title (the filter bar is unaffected).')) +
+          toggle('showCardGroup', Z('卡片显示分组', 'Show group on cards'), Z('标准卡片标题后显示分组名（小卡片只显示国旗与名称；不影响分组筛选栏）。', 'Group name after the standard card title (compact cards show flag and name only; the filter bar is unaffected).')) +
           toggle('groupSections', Z('按分组分段显示', 'Section by group'), Z('节点网格按分组插入小标题，顺序遵循下方“分组排序”。', 'Inserts a heading per group, ordered as in "Group order" below.')) +
           toggle('enableHomeSort', Z('启用排序切换', 'Let visitors sort'), Z('首页显示排序控件，访客可临时切换排序方式（非默认排序时离线节点置底）。', 'Shows sort controls; offline nodes go last when not using the default order.')) +
           toggle('hideAdminEntryWhenLoggedOut', Z('未登录时隐藏后台入口', 'Hide admin link when logged out'), Z('仅隐藏访客看到的 “Admin Login”；/admin 仍可直接访问，登录后自动显示。', 'Hides "Admin Login" for visitors; /admin still works and the link returns after login.')) +
@@ -189,7 +189,7 @@
       return section('06', kicker('06'), Z('卡片显示项', 'Card contents'), Z('分别管理跨卡片视图的信息块，以及小卡片专属的信息密度。', 'Blocks shared by both card views, and what compact cards show.'),
         '<div class="m-list-h"><span>' + Z('跨视图设置', 'Both views') + '</span><small>' + Z('适用于标准卡片与小卡片。', 'Standard and compact cards.') + '</small></div>' +
         '<div class="m-grid2">' +
-          toggle('showConnections', Z('显示连接数（TCP/UDP）', 'Show connections (TCP/UDP)'), Z('在标准卡片 Workload 与小卡片底栏展示实时 TCP / UDP 连接数；关闭后 Workload 改显示在线时长。', 'Live TCP / UDP counts in Workload and the compact footer; when off, Workload shows uptime.')) +
+          toggle('showConnections', Z('显示连接数（TCP/UDP）', 'Show connections (TCP/UDP)'), Z('在标准卡片 Workload 中展示实时 TCP / UDP 连接数；关闭后改显示在线时长。', 'Live TCP / UDP counts in the Workload block of standard cards; when off, it shows uptime.')) +
           toggle('showSwap', Z('显示 Swap 信息块', 'Show Swap block'), Z('关闭后标准卡片只保留网速、流量、负载三个信息块。', 'When off, standard cards keep net rate, traffic and workload only.')) +
         '</div>' +
         '<div class="m-list-h"><span>' + Z('小卡片专属', 'Compact cards') + '</span><small>' + Z('控制小卡片底栏的信息密度；实时速率始终显示。', 'Footer details; the live rate is always shown.') + '</small></div>' +

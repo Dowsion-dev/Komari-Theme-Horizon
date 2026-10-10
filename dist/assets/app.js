@@ -1173,15 +1173,14 @@
     };
     var h = '<div><div class="node-head-row"><div class="node-ident">' +
       '<div class="node-os monitor-chip">' + osIcon(n.os) + '</div>' +
-      '<h3 class="node-title"><span class="node-status-dot" aria-hidden="true"></span>' + (n.region ? flagImg(n.region) + ' ' : '') + '<span class="node-name">' + esc(n.name) + '</span>' +
-      (V.group ? '<span class="node-provider-sep" aria-hidden="true">·</span><span class="node-provider">' + esc(V.group) + '</span>' : '') + '</h3></div>' +
+      '<h3 class="node-title"><span class="node-status-dot" aria-hidden="true"></span>' + (n.region ? flagImg(n.region) + ' ' : '') + '<span class="node-name">' + esc(n.name) + '</span></h3></div>' +
       (T.compactShowUptime ? '<span class="chip">' + icon(V.on ? 'clock' : 'cloud-off') + (V.on ? uptime(V.r.uptime) : _t('Offline', '离线')) + '</span>' : '') + '</div>' +
       '<div class="cm-grid">' + meter('CPU', V.cpu, 'g-blue') + meter(_t('MEM', '内存'), pct(V.memU, V.memT), 'g-emerald') + meter(_t('DISK', '硬盘'), pct(V.diskU, V.diskT), 'g-amber') + '</div>' +
       compactProbes(n) +
       '<div class="cm-net"><div class="cm-line"><span class="rx">' + icon('arrow-down') + speed(net.down) + '</span><span class="tx">' + icon('arrow-up') + speed(net.up) + '</span></div>' +
-      (T.compactShowTrafficTotal || T.showConnections ? '<div class="cm-line">' : '') +
+      (T.compactShowTrafficTotal ? '<div class="cm-line">' : '') +
       (T.compactShowTrafficTotal ? (function () { var tr = trafficOf(n), lim = num(n.traffic_limit); var bt = lim > 0 ? String(n.traffic_limit_type || 'max').toLowerCase() : 'sum'; return '<span class="muted" title="' + esc(resetTitle(tr)) + '">' + (BILL_LABEL[bt] ? BILL_LABEL[bt][0] : 'MAX') + ' ' + (tr.approx || tr.pending ? '≈' : '') + bytesPrecise(trafficUsedBy(bt, tr)) + (lim > 0 ? ' / ' + bytesTotal(lim) + ' · ' + Math.round(pct(trafficUsedBy(bt, tr), lim)) + '%' : '') + (T.showResetCountdown && tr.cyc ? ' · ↻' + tr.cyc.daysLeft + 'd' : '') + '</span>'; })() : '') +
-      (T.showConnections ? '<span class="muted">' + num(V.conn.tcp) + 'T · ' + num(V.conn.udp) + 'U</span>' : '') + (T.compactShowTrafficTotal || T.showConnections ? '</div>' : '') + '</div></div>';
+      (T.compactShowTrafficTotal ? '</div>' : '') + '</div></div>';
     return h + footerHTML(n, { noTags: true, noBilling: !T.compactShowBilling });
   }
 
@@ -1743,7 +1742,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.7.0';
+    sc.src = '/assets/manage.js?v=1.7.1';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
