@@ -4,7 +4,7 @@
 
 纯 HTML / CSS / JS，无需构建。
 
-**在线演示**：<https://dowsion-dev.github.io/Komari-Theme-Horizon/> — 15 台模拟节点，覆盖 CN / HK / JP / US / DE，按 线路机 / 落地机 / 家宽 分组；数据在浏览器内模拟，右上角齿轮可体验主题设置（只保存在本机）。
+**在线演示**：<https://demo.dowsion.com> — 15 台模拟节点，覆盖 CN / HK / JP / US / DE，按 线路机 / 落地机 / 家宽 分组；数据在浏览器内模拟，右上角齿轮可体验主题设置（只保存在本机）。
 
 <p align="center"><img src="preview.png" alt="Horizon preview" width="90%"></p>
 
