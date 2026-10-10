@@ -60,6 +60,10 @@ def main():
         if left:
             sys.exit(f'build-demo: absolute href left in {p}: {left[0].strip()[:120]}')
     (OUT / '.nojekyll').write_text('')
+    # custom domain for GitHub Pages: put the bare host name (e.g. demo.example.com) in demo/CNAME
+    cname = ROOT / 'demo' / 'CNAME'
+    if cname.exists() and cname.read_text().strip():
+        (OUT / 'CNAME').write_text(cname.read_text().strip() + '\n')
     print(f'demo site → {OUT} (Horizon v{VERSION})')
 
 
