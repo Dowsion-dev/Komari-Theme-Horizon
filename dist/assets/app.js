@@ -1107,6 +1107,30 @@
         '<div class="bar"><div class="g-amber" style="width:' + pct(V.diskU, V.diskT) + '%"></div></div></div>' +
     '</div>';
   }
+  // CPU / memory / disk / load as a 2×2 grid of tiles: value on the right, detail line, segmented bar
+  var SEG_N = 16;
+  function segBar(p, cls) {
+    var on = p > 0 ? Math.max(1, Math.round(clamp(p, 0, 100) / 100 * SEG_N)) : 0, out = '';
+    for (var i = 0; i < SEG_N; i++) out += '<i' + (i < on ? ' class="on"' : '') + '></i>';
+    return '<div class="seg-bar ' + cls + '" aria-hidden="true">' + out + '</div>';
+  }
+  function loadPct(V) { return V.cores > 0 ? num(V.load.load1) / V.cores * 100 : num(V.load.load1) * 100; }
+  function resTiles(n, V) {
+    var T = S.T, l1 = num(V.load.load1);
+    var tile = function (ic, label, value, unit, sub, subTitle, p, cls) {
+      return '<div class="rt"><div class="rt-top"><span class="rt-k">' + icon(ic) + label + '</span><span class="rt-v">' + value + (unit ? '<small>' + unit + '</small>' : '') + '</span></div>' +
+        '<div class="rt-sub" title="' + esc(subTitle || '') + '">' + sub + '</div>' + segBar(p, cls) + '</div>';
+    };
+    var pctNum = function (v) { return (Math.round(v * 100) / 100).toFixed(v >= 10 ? 1 : 2); };
+    var memP = pct(V.memU, V.memT), diskP = pct(V.diskU, V.diskT);
+    var loadSub = T.showConnections ? num(V.conn.tcp) + ' TCP · ' + num(V.conn.udp) + ' UDP' : '5m ' + num(V.load.load5).toFixed(2) + ' · 15m ' + num(V.load.load15).toFixed(2);
+    return '<div class="res-tiles">' +
+      tile('cpu', 'CPU', pctNum(V.cpu), '%', (V.cores ? _t(V.cores + ' cores', V.cores + ' 核') : '') + (n.cpu_name ? ' · ' + esc(n.cpu_name) : ''), n.cpu_name, V.cpu, 's-cpu') +
+      tile('memory-stick', _t('Memory', '内存'), pctNum(memP), '%', bytesPrecise(V.memU) + ' / ' + bytesPrecise(V.memT), '', memP, 's-mem') +
+      tile('hard-drive', _t('Disk', '磁盘'), pctNum(diskP), '%', bytesPrecise(V.diskU) + ' / ' + bytesPrecise(V.diskT), '', diskP, 's-disk') +
+      tile('gauge', _t('Load', '负载'), l1.toFixed(2), '', loadSub, _t('Load average 1m · 5m · 15m: ', '平均负载 1 / 5 / 15 分钟：') + [l1, num(V.load.load5), num(V.load.load15)].map(function (x) { return x.toFixed(2); }).join(' · ') + ' · ' + num(V.r.process) + _t(' processes', ' 个进程'), loadPct(V), 's-load') +
+    '</div>';
+  }
   function mini(ic, cls, title, right, rows) {
     return '<div class="mini ' + (ic === 'boxes' ? 'workload ' : '') + 'monitor-surface-secondary"><div class="mini-head"><span class="t">' + icon(ic, cls) + ' ' + esc(title) + '</span>' + right + '</div><div class="mini-rows">' + rows + '</div></div>';
   }
@@ -1171,7 +1195,7 @@
         (n.virtualization ? '<span class="chip">' + esc(n.virtualization) + '</span>' : '') +
         '<span class="chip" aria-label="' + _t('Uptime', '在线时长') + '">' + icon(V.on ? 'clock' : 'cloud-off') + (V.on ? uptime(V.r.uptime) : _t('Offline', '离线')) + '</span>' + resetChip +
       '</div></div>';
-    h += resList(n, V);
+    h += resTiles(n, V);
     // live rate + cycle traffic in one block: upload | download, each with a dot trail of recent rates and its cycle total
     var hist = S.speedHist[n.uuid] || { up: [], down: [] };
     var side = function (dir) {
@@ -1187,10 +1211,6 @@
       '<div class="mini netbox monitor-surface-secondary' + (quota ? ' has-quota' : '') + '"><div class="mini-head"><span class="t">' + icon('network', 'c-indigo') + ' ' + esc(trafficTitle) + '</span>' + trafficRight + '</div>' +
         '<div class="nb-cols">' + side('up') + side('down') + '</div>' + quota + '</div>'
     ];
-    // Swap was dropped in v1.8; Workload spans the full card width
-    minis.push(mini('boxes', 'c-purple', _t('Workload', '负载'), '<span class="pill">' + num(V.r.process) + _t(' Procs', ' 进程') + '</span>',
-      miniRow('<span class="k" title="' + _t('Load average 1m · 5m · 15m', '平均负载 1 / 5 / 15 分钟') + '">' + _t('Load', '负载') + '</span>', [V.load.load1, V.load.load5, V.load.load15].map(function (x) { return '<b>' + num(x).toFixed(2) + '</b>'; }).join('<i class="sep">·</i>'), 'wl') +
-      (T.showConnections ? miniRow('<span class="k">' + _t('Sockets', '连接') + '</span>', '<b>' + num(V.conn.tcp) + '<small>TCP</small></b><i class="sep">·</i><b>' + num(V.conn.udp) + '<small>UDP</small></b>', 'wl') : miniRow('<span class="k">' + _t('Uptime', '在线') + '</span>', V.on ? uptime(V.r.uptime) : '—'))));
     h += '<div class="mini-grid">' + minis.join('') + '</div>';
     h += probeSummary(n) + '</div>';
     return h + footerHTML(n);
@@ -1205,7 +1225,8 @@
       '<div class="node-os monitor-chip">' + osIcon(n.os) + '</div>' +
       '<h3 class="node-title"><span class="node-status-dot" aria-hidden="true"></span>' + (n.region ? flagImg(n.region) + ' ' : '') + '<span class="node-name">' + esc(n.name) + '</span></h3></div>' +
       (T.compactShowUptime ? '<span class="chip">' + icon(V.on ? 'clock' : 'cloud-off') + (V.on ? uptime(V.r.uptime) : _t('Offline', '离线')) + '</span>' : '') + '</div>' +
-      '<div class="cm-grid">' + meter('CPU', V.cpu, 'g-blue') + meter(_t('MEM', '内存'), pct(V.memU, V.memT), 'g-emerald') + meter(_t('DISK', '硬盘'), pct(V.diskU, V.diskT), 'g-amber') + '</div>' +
+      '<div class="cm-grid">' + meter('CPU', V.cpu, 'g-blue') + meter(_t('MEM', '内存'), pct(V.memU, V.memT), 'g-emerald') + meter(_t('DISK', '硬盘'), pct(V.diskU, V.diskT), 'g-amber') +
+        '<div class="cm" title="' + _t('Load average (1m), bar = load / cores', '1 分钟平均负载，进度 = 负载 / 核心数') + '"><div class="cm-top"><span>' + _t('LOAD', '负载') + '</span><b>' + num(V.load.load1).toFixed(2) + '</b></div><div class="bar"><div class="g-pink" style="width:' + clamp(loadPct(V), 0, 100) + '%"></div></div></div></div>' +
       compactProbes(n) +
       '<div class="cm-net"><div class="cm-line"><span class="rx">' + icon('arrow-down') + speed(net.down) + '</span><span class="tx">' + icon('arrow-up') + speed(net.up) + '</span></div>' +
       (T.compactShowTrafficTotal ? '<div class="cm-line">' : '') +
@@ -1778,7 +1799,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.8.0';
+    sc.src = '/assets/manage.js?v=1.9.0';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
