@@ -4,6 +4,8 @@
 
 纯 HTML / CSS / JS，无需构建。
 
+**在线演示**：<https://dowsion-dev.github.io/Komari-Theme-Horizon/> — 15 台模拟节点，覆盖 CN / HK / JP / US / DE，按 线路机 / 落地机 / 家宽 分组；数据在浏览器内模拟，右上角齿轮可体验主题设置（只保存在本机）。
+
 <p align="center"><img src="preview.png" alt="Horizon preview" width="90%"></p>
 
 ## 功能
@@ -118,7 +120,11 @@
 ```bash
 ADMIN=1 node tools/mock.js "$PWD/dist" 8787   # 模拟 Komari API + WebSocket（ADMIN=1 = 已登录）
 # 浏览器打开 http://localhost:8787 ；设置页 http://localhost:8787/?view=theme-manage
+
+python3 tools/build-demo.py _site                 # 生成静态演示站（dist + demo/demo.js 浏览器内模拟后端）
 ```
+
+推送到 main 后，`Demo site` 工作流会自动重建 `gh-pages` 分支上的演示站。
 
 ## 致谢
 

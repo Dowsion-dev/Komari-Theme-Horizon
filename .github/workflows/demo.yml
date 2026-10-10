@@ -1,0 +1,34 @@
+name: Demo site
+
+# Rebuilds the GitHub Pages demo (gh-pages branch) whenever the theme or the simulated backend changes.
+on:
+  push:
+    branches: [main]
+    paths: ['dist/**', 'demo/**', 'tools/build-demo.py', 'komari-theme.json', '.github/workflows/demo.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: demo
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: python3 tools/build-demo.py _site
+
+      - name: Publish to gh-pages
+        run: |
+          cd _site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "demo: ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
