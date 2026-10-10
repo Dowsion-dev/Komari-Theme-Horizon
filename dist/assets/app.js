@@ -1140,9 +1140,9 @@
     };
     var pctNum = function (v) { return (Math.round(v * 100) / 100).toFixed(v >= 10 ? 1 : 2); };
     var memP = pct(V.memU, V.memT), diskP = pct(V.diskU, V.diskT);
-    var loadSub = T.showConnections ? num(V.conn.tcp) + ' TCP · ' + num(V.conn.udp) + ' UDP' : '5m ' + num(V.load.load5).toFixed(2) + ' · 15m ' + num(V.load.load15).toFixed(2);
+    var loadSub = '5m ' + num(V.load.load5).toFixed(2) + ' · 15m ' + num(V.load.load15).toFixed(2);
     return '<div class="res-tiles">' +
-      tile('cpu', 'CPU', pctNum(V.cpu), '%', (V.cores ? _t(V.cores + ' cores', V.cores + ' 核') : '') + (n.cpu_name ? ' · ' + esc(n.cpu_name) : ''), n.cpu_name, V.cpu, 'g-blue') +
+      tile('cpu', 'CPU', pctNum(V.cpu), '%', (V.cores ? V.cores + ' × ' : '') + esc(shortCpu(n.cpu_name) || 'CPU'), n.cpu_name, V.cpu, 'g-blue') +
       tile('memory-stick', _t('Memory', '内存'), pctNum(memP), '%', bytesPrecise(V.memU) + ' / ' + bytesPrecise(V.memT), '', memP, 'g-purple') +
       tile('hard-drive', _t('Disk', '磁盘'), pctNum(diskP), '%', bytesPrecise(V.diskU) + ' / ' + bytesPrecise(V.diskT), '', diskP, 'g-amber') +
       tile('gauge', _t('Load', '负载'), l1.toFixed(2), '', loadSub, _t('Load average 1m · 5m · 15m: ', '平均负载 1 / 5 / 15 分钟：') + [l1, num(V.load.load5), num(V.load.load15)].map(function (x) { return x.toFixed(2); }).join(' · ') + ' · ' + num(V.r.process) + _t(' processes', ' 个进程'), loadPct(V), 'g-pink') +
@@ -1158,18 +1158,21 @@
     var r = scaleBytes(b), v = r[0];
     return [r[1] === 'B' ? String(Math.round(v)) : v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : String(Math.round(v)), r[1] + '/s'];
   }
-  // recent live rates as a row of dots: bigger / stronger = faster (relative to the visible window)
-  var TRAIL_N = 16;
-  function dotTrail(arr) {
-    var a = arr.slice(-TRAIL_N), max = 0, out = '';
+  // recent live rates as a small area sparkline (same language as the history charts)
+  var TRAIL_N = 24;
+  function sparkline(arr, cls) {
+    var a = arr.slice(-TRAIL_N), max = 0;
     a.forEach(function (v) { if (v > max) max = v; });
-    for (var i = 0; i < TRAIL_N; i++) {
-      var v = a[i - (TRAIL_N - a.length)];
-      if (v == null) { out += '<i></i>'; continue; }
-      var k = max > 0 ? v / max : 0;
-      out += '<i class="on" style="--k:' + k.toFixed(2) + '"></i>';
-    }
-    return '<span class="nb-dots" aria-hidden="true">' + out + '</span>';
+    if (a.length < 2 || max <= 0) return '<svg class="nb-spark ' + cls + '" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="100" y1="15" y2="15" class="nb-base"/></svg>';
+    var step = 100 / (TRAIL_N - 1), x0 = (TRAIL_N - a.length) * step, pts = a.map(function (v, i) { return [(x0 + i * step).toFixed(2), (15 - v / max * 13).toFixed(2)]; });
+    var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0] + ' ' + p[1]; }).join(' ');
+    return '<svg class="nb-spark ' + cls + '" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="100" y1="15" y2="15" class="nb-base"/>' +
+      '<path class="nb-area" d="' + line + ' L' + pts[pts.length - 1][0] + ' 16 L' + pts[0][0] + ' 16 Z"/><path class="nb-line" d="' + line + '"/></svg>';
+  }
+  // "AMD EPYC 9654 96-Core Processor" → "AMD EPYC 9654", "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz" → "Intel Xeon E5-2680 v4"
+  function shortCpu(name) {
+    return String(name || '').replace(/\((R|TM|tm|r)\)/g, '').replace(/@.*$/, '').replace(/\b\d+-Core\b/gi, '').replace(/\b(Processor|CPU)\b/gi, '')
+      .replace(/\s{2,}/g, ' ').trim();
   }
 
   function resetTitle(tr) {
@@ -1220,13 +1223,14 @@
       return '<div class="nb-side ' + (up ? 'tx' : 'rx') + '">' +
         '<div class="nb-top"><span class="nb-k">' + icon(up ? 'arrow-up' : 'arrow-down') + (up ? _t('Upload', '上行') : _t('Download', '下行')) + '</span>' +
           '<span class="nb-v">' + p[0] + '<small>' + p[1] + '</small></span></div>' +
-        '<div class="nb-trail">' + dotTrail(up ? hist.up : hist.down) + '<span class="nb-live">' + _t('live', '实时') + '</span></div>' +
+        '<div class="nb-trail">' + sparkline(up ? hist.up : hist.down, up ? 'tx' : 'rx') + '<span class="nb-live">' + _t('live', '实时') + '</span></div>' +
         '<div class="nb-total"><span class="nb-k">' + icon('globe') + (up ? _t('Out', '出站') : _t('In', '入站')) + '</span><b>' + ax + bytesPrecise(up ? tr.up : tr.down) + '</b></div>' +
       '</div>';
     };
     var minis = [
       '<div class="mini netbox monitor-surface-secondary' + (quota ? ' has-quota' : '') + '"><div class="mini-head"><span class="t">' + icon('network', 'c-indigo') + ' ' + esc(trafficTitle) + '</span>' + trafficRight + '</div>' +
-        '<div class="nb-cols">' + side('up') + side('down') + '</div>' + quota + '</div>'
+        '<div class="nb-cols">' + side('up') + side('down') + '</div>' + quota +
+        (T.showConnections ? '<div class="nb-conn"><span class="nb-k">' + icon('activity') + _t('Connections', '连接数') + '</span><b>' + num(V.conn.tcp) + '<small>TCP</small><i class="sep">·</i>' + num(V.conn.udp) + '<small>UDP</small></b></div>' : '') + '</div>'
     ];
     h += '<div class="mini-grid">' + minis.join('') + '</div>';
     h += probeSummary(n) + '</div>';
@@ -1293,23 +1297,32 @@
   // the 20 probe cells get whole device pixels each (fitProbeBars picks cell + gap so the row stays full width);
   // fractional widths made some cells look thicker than others
   function fitProbeBars(root) {
-    var dpr = window.devicePixelRatio || 1, minGap = dpr >= 2 ? 3 : 2;
+    var dpr = window.devicePixelRatio || 1;
     (root || document).querySelectorAll('.probe-bars').forEach(function (el) {
-      var W = Math.floor(el.getBoundingClientRect().width * dpr), cells = el.children, n = cells.length;
-      if (!W || n < 2) return;
-      // identical cell width in device pixels; the remainder is spread over the gaps (±1 device px, invisible)
-      var mg = minGap, c = Math.floor((W - (n - 1) * mg) / n);
-      while (c < 3 * Math.ceil(dpr / 2) && mg > 1) { mg--; c = Math.floor((W - (n - 1) * mg) / n); } // narrow cards: thinner gaps first
-      c = Math.max(1, c);
-      var G = W - n * c, base = Math.floor(G / (n - 1)), extra = G - base * (n - 1);
-      var key = W + ':' + c;
-      if (el._fit === key && cells[0].style.width) return;
-      el._fit = key;
-      for (var i = 0; i < n; i++) {
-        var g = i ? base + (Math.floor(i * extra / (n - 1)) - Math.floor((i - 1) * extra / (n - 1))) : 0;
-        cells[i].style.width = c / dpr + 'px';
-        cells[i].style.marginLeft = g / dpr + 'px';
+      var cells = el.children, n = cells.length; if (n < 2) return;
+      var r = el.getBoundingClientRect(), W = Math.floor(r.width * dpr); if (!W) return;
+      // one cell width, one gap and one height for every cell (whole device pixels); pick the pair that wastes least
+      var best = null;
+      for (var g = Math.max(1, Math.round(dpr)); g <= Math.round(3 * dpr); g++) {
+        var c = Math.floor((W - (n - 1) * g) / n), left = W - n * c - (n - 1) * g;
+        if (c < g || c < 2) continue;
+        if (!best || left < best.left || (left === best.left && Math.abs(c - 2 * g) < Math.abs(best.c - 2 * best.g))) best = { c: c, g: g, left: left };
       }
+      if (!best) return;
+      var h = Math.round(6 * dpr), pad = Math.floor(best.left / 2);
+      var key = [W, best.c, best.g, pad, dpr].join(':');
+      if (el._fit !== key || !cells[0].style.width) {
+        el._fit = key;
+        for (var i = 0; i < n; i++) {
+          cells[i].style.width = best.c / dpr + 'px';
+          cells[i].style.height = h / dpr + 'px';
+          cells[i].style.marginLeft = (i ? best.g : pad) / dpr + 'px';
+        }
+      }
+      // snap the row onto the device-pixel grid so no cell lands on a half pixel
+      el.style.transform = '';
+      var rr = el.getBoundingClientRect(), fx = rr.left * dpr - Math.round(rr.left * dpr), fy = rr.top * dpr - Math.round(rr.top * dpr);
+      if (Math.abs(fx) > 0.01 || Math.abs(fy) > 0.01) el.style.transform = 'translate(' + (-fx / dpr) + 'px,' + (-fy / dpr) + 'px)';
     });
   }
   window.addEventListener('resize', function () { fitProbeBars(); });
@@ -1840,7 +1853,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.9.1';
+    sc.src = '/assets/manage.js?v=1.9.2';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
