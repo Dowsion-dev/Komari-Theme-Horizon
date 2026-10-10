@@ -480,6 +480,12 @@ h1, h2, h3, p { font-size: inherit; font-weight: inherit; }
 .banner { margin-top: 24px; border-radius: 12px; border-width: 1px; border-style: solid; padding: 32px 16px; text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--monitor-muted); }
 .footer { padding: 0 0 24px; text-align: center; font-family: var(--font-mono); font-size: 10px; color: var(--monitor-muted); }
 .footer a:hover { color: var(--t-strong); }
+.footer { line-height: 16px; }
+.footer a { text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 35%, transparent); text-underline-offset: 2px; }
+.footer img { display: inline-block; max-height: 20px; vertical-align: middle; }
+.m-icon-row { display: flex; align-items: center; gap: 8px; }
+.m-icon-row .m-input { flex: 1 1 auto; min-width: 0; }
+.m-fav { flex: none; width: 32px; height: 32px; padding: 4px; border-radius: 8px; border: 1px solid var(--monitor-border); background: var(--monitor-surface-1); object-fit: contain; }
 
 @keyframes pulse { 50% { opacity: .5; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

@@ -51,6 +51,9 @@
     function listArea(key, placeholder) {
       return '<textarea class="m-input m-area" data-k="' + key + '" data-type="list" placeholder="' + esc(placeholder || '') + '">' + esc((D[key] || []).join('\n')) + '</textarea>';
     }
+    function textArea(key, placeholder) {
+      return '<textarea class="m-input m-area" data-k="' + key + '" data-type="text" placeholder="' + esc(placeholder || '') + '">' + esc(D[key] || '') + '</textarea>';
+    }
     function select(key, opts) {
       return '<select class="m-input" data-k="' + key + '" data-type="text">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(D[key]) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>';
     }
@@ -100,8 +103,14 @@
           field(Z('站点名旁的标签', 'Label next to the site name'), input('productLabel', 'MONITOR'), Z('留空则不显示。', 'Leave empty to hide.')) +
           field(Z('节点区标题', 'Node section title'), input('nodesTitle', 'Cluster Infrastructure Nodes'), Z('保持默认时会随语言显示为“集群节点”。', 'The default title is translated automatically.')) +
           field(Z('Logo 图片地址', 'Logo image URL'), input('logoUrl', Z('https://… 或 /assets/logo.png', 'https://… or /assets/logo.png')), Z('留空使用默认闪电图标。', 'Leave empty for the default bolt icon.')) +
-          '<div class="m-field">' + toggle('showFooter', Z('显示页脚', 'Show footer'), Z('底部 “Powered by Komari Monitor”。', '"Powered by Komari Monitor" at the bottom.')) + '</div>' +
-        '</div>'), icon('type'));
+          field(Z('网页标签图标 (favicon)', 'Browser tab icon (favicon)'), '<div class="m-icon-row">' + input('faviconUrl', Z('https://…/favicon.png 或 /assets/icon.svg', 'https://…/favicon.png or /assets/icon.svg')) + '<img class="m-fav" alt="" src="' + esc(D.faviconUrl || '/favicon.svg') + '"></div>', Z('支持 PNG / SVG / ICO 地址或 data:image URI；留空使用主题默认图标。修改后浏览器标签立即预览。', 'PNG / SVG / ICO URL or a data:image URI; empty = the theme icon. The tab icon previews immediately.')) +
+        '</div>') +
+        sub(Z('页脚', 'Footer'), Z('可写纯文本或简单 HTML（链接、加粗、图片等，脚本会被过滤）；换行会保留。占位符：<code>{year}</code> 当前年份、<code>{sitename}</code> 站点名。留空显示默认的 “Powered by Komari Monitor”。', 'Plain text or simple HTML (links, bold, images; scripts are stripped); line breaks are kept. Placeholders: <code>{year}</code>, <code>{sitename}</code>. Empty = the default "Powered by Komari Monitor".'),
+          '<div class="m-row-end">' + toggle('showFooter', Z('显示页脚', 'Show footer'), '') + '</div>' +
+          '<div class="m-grid2">' +
+            field(Z('页脚内容', 'Footer content'), textArea('footerContent', '© {year} {sitename} · Powered by <a href="https://github.com/komari-monitor/komari">Komari</a>')) +
+            field(Z('英文页脚（可选）', 'English footer (optional)'), textArea('footerContentEn', Z('留空则英文界面也使用左侧内容', 'Empty = same as the main footer')), Z('访客切换到 English 时显示。', 'Shown when the visitor switches to English.')) +
+          '</div>'), icon('type'));
     }
     function sView() {
       var opts = [['standard', Z('标准卡片', 'Standard'), 'layout-grid'], ['compact', Z('小卡片', 'Compact'), 'rows-3']];
@@ -205,14 +214,18 @@
         var defDay = KC.resetDayWith(KC.normalizeSettings(Object.assign({}, D, { trafficResetDays: {} })), nd);
         var opts = '<option value="">' + Z('默认（', 'Default (') + (defDay ? dayLabel(defDay) : Z('不重置', 'never')) + Z('）', ')') + '</option><option value="-1"' + (custom === -1 ? ' selected' : '') + '>' + Z('不重置', 'Never') + '</option>';
         for (var k = 1; k <= 31; k++) opts += '<option value="' + k + '"' + (Number(custom) === k ? ' selected' : '') + '>' + dayLabel(k) + '</option>';
+        var tzv = (D.trafficResetTz || {})[nd.uuid], hasTz = tzv !== undefined && tzv !== '' && tzv !== null;
+        var tzOpts = '<option value="">' + Z('默认（', 'Default (') + KC.tzLabel(Number(D.trafficResetUtcOffset) || 0) + Z('）', ')') + '</option>';
+        for (var z = -12; z <= 14; z += 0.5) tzOpts += '<option value="' + z + '"' + (hasTz && Number(tzv) === z ? ' selected' : '') + '>' + KC.tzLabel(z) + '</option>';
         var cal = ui.cal[nd.uuid] || {};
         var usage = (tr.pending ? '<span class="m-dim">' + Z('计算中…', 'Counting…') + '</span> ' : '') + '↓ ' + (tr.approx ? '≈' : '') + KC.bytesPrecise(tr.down) + ' · ↑ ' + (tr.approx ? '≈' : '') + KC.bytesPrecise(tr.up) + (lim > 0 ? ' · ' + Z('限额 ', 'limit ') + KC.bytesPrecise(lim) + ' (' + esc(nd.traffic_limit_type || 'max') + ')' : '');
         return '<div class="m-traffic monitor-surface-secondary' + (c ? ' is-set' : '') + '">' +
           '<div class="m-node-id">' + KC.flagImg(nd.region) + '<b>' + esc(nd.name) + '</b><small>' + (tr.engine ? Z('周期统计', 'Cycle count') : Z('探针计数', 'Agent counter')) +
-            (cyc ? Z(' · 下次重置 ', ' · next reset ') + KC.dateYMD(new Date(cyc.next)) + Z('（', ' (') + (cyc.daysLeft === 0 ? Z('今天', 'today') : Z(cyc.daysLeft + ' 天后', 'in ' + cyc.daysLeft + ' days')) + Z('）', ')') : Z(' · 未设置重置日', ' · no reset day')) + '</small></div>' +
+            (cyc ? Z(' · 下次重置 ', ' · next reset ') + KC.cycleYMD(cyc) + ' ' + KC.tzLabel(cyc.tz) + Z('（', ' (') + (cyc.daysLeft === 0 ? Z('今天', 'today') : Z(cyc.daysLeft + ' 天后', 'in ' + cyc.daysLeft + ' days')) + Z('）', ')') : Z(' · 未设置重置日', ' · no reset day')) + '</small></div>' +
           '<div class="m-usage mono">' + usage + (c ? '<div class="m-dim">' + (c.auto ? Z('自动存档', 'Auto checkpoint') : Z('已校准', 'Calibrated')) + Z('于 ', ' at ') + esc(KC.dateTime(new Date(c.at))) + '：↓ ' + KC.bytesPrecise(c.down) + ' · ↑ ' + KC.bytesPrecise(c.up) + '</div>' : '') + '</div>' +
           '<div class="m-traffic-ctl">' +
             '<label class="m-mini"><span>' + Z('重置日', 'Reset day') + '</span><select class="m-input" data-rday="' + esc(nd.uuid) + '">' + opts + '</select></label>' +
+            '<label class="m-mini"><span>' + Z('时区', 'Time zone') + '</span><select class="m-input" data-rtz="' + esc(nd.uuid) + '">' + tzOpts + '</select></label>' +
             '<label class="m-mini"><span>' + Z('已用下行 GB', 'Used in (GB)') + '</span><input class="m-input" type="number" min="0" step="0.01" data-cal="' + esc(nd.uuid) + '" data-dir="down" value="' + esc(cal.down != null ? cal.down : '') + '" placeholder="' + esc(fmtGB(tr.down)) + '"></label>' +
             '<label class="m-mini"><span>' + Z('已用上行 GB', 'Used out (GB)') + '</span><input class="m-input" type="number" min="0" step="0.01" data-cal="' + esc(nd.uuid) + '" data-dir="up" value="' + esc(cal.up != null ? cal.up : '') + '" placeholder="' + esc(fmtGB(tr.up)) + '"></label>' +
             '<div class="m-mini-btns"><button type="button" class="m-btn" data-calset="' + esc(nd.uuid) + '" title="' + Z('以当前时刻为基准，把本周期已用流量设为左侧数值', 'Set this cycle\'s usage to the values on the left, as of now') + '">' + Z('设定已用', 'Set used') + '</button>' +
@@ -356,7 +369,7 @@
       var active = document.activeElement && document.activeElement.id;
       page.innerHTML = '<div class="manage-root container">' +
         '<div class="m-masthead"><div><div class="m-kicker big">HORIZON · ' + Z('主题控制台', 'THEME CONSOLE') + langSwitch() + '</div><h1>' + Z('主题设置', 'Theme settings') + '</h1><p>' + Z('集中调整 Horizon 的展示偏好、背景、费用与首页延迟绑定；保存后立即应用到当前站点。', 'Display preferences, background, costs and latency probes for Horizon; saved settings apply to the site right away.') + '</p></div>' +
-          '<dl class="m-meta"><div><dt>' + Z('主题', 'Theme') + '</dt><dd>' + esc(theme) + '</dd></div><div><dt>' + Z('节点', 'Nodes') + '</dt><dd>' + S.allNodes.length + '</dd></div><div><dt>' + Z('Ping 任务', 'Ping tasks') + '</dt><dd>' + S.pingTasks.length + '</dd></div><div><dt>' + Z('单独覆盖', 'Overrides') + '</dt><dd>' + overrideCount() + '</dd></div></dl></div>' +
+          '<dl class="m-meta"><div><dt>' + Z('主题', 'Theme') + '</dt><dd>' + esc(theme.charAt(0).toUpperCase() + theme.slice(1)) + '</dd></div><div><dt>' + Z('节点', 'Nodes') + '</dt><dd>' + S.allNodes.length + '</dd></div><div><dt>' + Z('Ping 任务', 'Ping tasks') + '</dt><dd>' + S.pingTasks.length + '</dd></div><div><dt>' + Z('单独覆盖', 'Overrides') + '</dt><dd>' + overrideCount() + '</dd></div></dl></div>' +
         '<nav class="m-toc">' + TOC.map(function (x) { return '<a href="#m-' + x[0] + '"><span>' + x[0] + '</span>' + Z(x[1], x[2]) + '</a>'; }).join('') + '</nav>' +
         sAppearance() + sView() + sBackground() + sHome() + sHidden() + sCards() + sTraffic() + sCost() + sLatency() + sAdvanced() +
         '<div class="m-savebar monitor-surface-primary"><a href="/" class="m-btn">' + icon('arrow-left') + Z('返回首页', 'Back to home') + '</a>' +
@@ -369,7 +382,7 @@
       if (active) { var el = document.getElementById(active); if (el) { el.focus(); if (el.setSelectionRange && el.value) el.setSelectionRange(el.value.length, el.value.length); } }
     }
 
-    function preview() { var T = KC.normalizeSettings(D); KC.applyPreview(T); KC.applyFonts(T); }
+    function preview() { var T = KC.normalizeSettings(D); KC.applyPreview(T); KC.applyFonts(T); KC.applyFavicon(T); }
     function setVal(el) {
       var k = el.dataset.k, t = el.dataset.type;
       if (el.type === 'checkbox') D[k] = el.checked;
@@ -391,7 +404,8 @@
         if (el.dataset.k === 'lossLineOpacity') { var p = page.querySelector('.m-loss-preview'); if (p) p.outerHTML = lossPreview(); }
       }
       ui.msg = ''; ui.err = '';
-      if (/^background|^surface|^font/.test(el.dataset.k)) preview();
+      if (/^background|^surface|^font|^favicon/.test(el.dataset.k)) preview();
+      if (el.dataset.k === 'faviconUrl') { var fi = page.querySelector('.m-fav'); if (fi) fi.src = el.value || '/favicon.svg'; }
       var st = page.querySelector('.m-status'); if (st) { st.className = 'm-status'; st.textContent = statusText(); }
     });
     page.addEventListener('change', function (e) {
@@ -401,6 +415,13 @@
         D.cardProbeTaskIds = ids.slice(0, D.probeCount).map(function (x) { return x || ''; });
         while (D.cardProbeTaskIds.length && !D.cardProbeTaskIds[D.cardProbeTaskIds.length - 1]) D.cardProbeTaskIds.pop();
         render(); return;
+      }
+      if (el.dataset.rtz) {
+        var tzm = clone(D.trafficResetTz || {});
+        if (el.value === '') delete tzm[el.dataset.rtz]; else tzm[el.dataset.rtz] = Number(el.value);
+        D.trafficResetTz = tzm; ui.msg = ''; render();
+        refreshTraffic(S.allNodes.filter(function (x) { return x.uuid === el.dataset.rtz; }));
+        return;
       }
       if (el.dataset.rday) {
         var rd = clone(D.trafficResetDays || {});

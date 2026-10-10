@@ -30,6 +30,7 @@ REWRITES = {
     'assets/manage.js': [
         ('href="/"', 'href="./"'),
         ('href="/admin/ping"', 'href="' + REPO + '"'),
+        ("'/favicon.svg'", "'favicon.svg'"),
     ],
 }
 

@@ -198,12 +198,26 @@
     if (persist) lsSet(FONT_KEY, JSON.stringify(plan));
   }
 
+  // custom browser-tab icon (cached so index.html can set it before the first paint)
+  var ICON_KEY = 'komari-horizon-favicon', defaultIcon = null;
+  function applyFavicon(T, persist) {
+    var link = document.querySelector('link[rel~="icon"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    if (defaultIcon == null) defaultIcon = link.getAttribute('data-default') || link.getAttribute('href') || '/favicon.svg';
+    link.setAttribute('data-default', defaultIcon);
+    var u = safeUrl(T.faviconUrl) || (/^data:image\//i.test(String(T.faviconUrl || '').trim()) ? String(T.faviconUrl).trim() : '');
+    link.removeAttribute('type');
+    link.setAttribute('href', u || defaultIcon);
+    if (persist) { if (u) lsSet(ICON_KEY, u); else try { localStorage.removeItem(ICON_KEY); } catch (e) { /* ignore */ } }
+  }
+
   // ---------------------------------------------------------------
   // theme settings (schema shared with manage.js)
   // ---------------------------------------------------------------
   var DEFAULTS = {
     // 01 appearance / branding
     defaultAppearance: 'system', productLabel: 'MONITOR', logoUrl: '', nodesTitle: 'Cluster Infrastructure Nodes', showFooter: true,
+    footerContent: '', footerContentEn: '', faviconUrl: '',
     defaultLanguage: 'auto', showLanguageToggle: true,
     fontSans: 'default', fontMono: 'default', fontSansUrl: '', fontSansFamily: '', fontMonoUrl: '', fontMonoFamily: '',
     // 02 views
@@ -222,7 +236,7 @@
     // 06 card items
     showConnections: true, showSwap: true, compactShowTrafficTotal: true, compactShowBilling: true, compactShowUptime: true,
     // 07 traffic cycle
-    trafficMode: 'agent', trafficResetDefault: 'expiry', trafficResetUtcOffset: 8, showResetCountdown: true,
+    trafficMode: 'agent', trafficResetDefault: 'expiry', trafficResetUtcOffset: 8, trafficResetTz: {}, showResetCountdown: true,
     trafficResetDays: {}, trafficCalib: {}, trafficAutoCheckpoint: false, trafficCheckpointHours: 12,
     // 08 cost
     showCostsToGuests: true, showRemainingValue: true, baseCurrency: 'USD', costRateApiUrl: 'https://api.frankfurter.dev/v2/rates?base=USD',
@@ -239,7 +253,7 @@
     expiry_warning_days: 'expiryWarningDays', refresh_interval_ms: 'refreshIntervalMs' };
   var RATING_PRESETS = {
     general: { traffic: 'Light,Regular,Heavy,Massive', bandwidth: 'Idle,Light,Active,Burst', asset: 'Starter,Standard,Premium,Whale' },
-    generalZh: { traffic: '轻度,常规,重度,海量', bandwidth: '空闲,轻载,活跃,爆发', asset: '入门,标准,高端,巨鲸' },
+    generalZh: { traffic: '轻度,常规,重度,海量', bandwidth: '空闲,轻载,活跃,爆发', asset: '入门,标准,顶级,富佬' },
     cultivation: { traffic: '初行,入道,御风,破空', bandwidth: '凝息,运转,疾行,瞬身', asset: '练气,筑基,结丹,元婴' }
   };
   var SORT_FIELDS = [['default', 'Default', '默认'], ['name', 'Name', '名称'], ['region', 'Region', '地区'], ['cpu', 'CPU', 'CPU'], ['memory', 'Memory', '内存'], ['disk', 'Storage', '硬盘'], ['netRate', 'Net Rate', '实时速率'], ['traffic', 'Traffic', '流量'], ['uptime', 'Uptime', '在线时长'], ['price', 'Price', '价格'], ['expiry', 'Expiry', '到期']];
@@ -536,7 +550,39 @@
         '<div class="quick-filters" id="filters"></div>' +
       '</div></div>' +
       '<div class="container grid-wrap"><section class="node-grid" id="grid"></section></div>' +
-      (T.showFooter ? '<footer class="footer">' + _t('Powered by', '基于') + ' <a href="https://github.com/komari-monitor/komari" target="_blank" rel="noopener">Komari Monitor</a></footer>' : '');
+      (T.showFooter ? '<footer class="footer">' + footerContent(T) + '</footer>' : '');
+  }
+
+  // footer: admin-written content (a small HTML subset, sanitised) with {year} / {sitename} placeholders
+  var DEFAULT_FOOTER = 'Powered by <a href="https://github.com/komari-monitor/komari">Komari Monitor</a>';
+  var FOOTER_TAGS = { A: 1, B: 1, STRONG: 1, I: 1, EM: 1, SMALL: 1, SPAN: 1, BR: 1, CODE: 1, IMG: 1, U: 1, S: 1 };
+  function sanitizeFooter(html) {
+    var tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    (function walk(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (c) {
+        if (c.nodeType === 3) return;
+        if (c.nodeType !== 1 || !FOOTER_TAGS[c.nodeName]) {
+          if (c.nodeType === 1 && !/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|TEMPLATE)$/.test(c.nodeName)) { walk(c); while (c.firstChild) node.insertBefore(c.firstChild, c); }
+          node.removeChild(c); return;
+        }
+        Array.prototype.slice.call(c.attributes).forEach(function (a) {
+          var n = a.name.toLowerCase(), v = a.value;
+          var ok = (n === 'href' && c.nodeName === 'A' && safeUrl(v)) || (n === 'src' && c.nodeName === 'IMG' && safeUrl(v)) ||
+            n === 'title' || n === 'alt' || (n === 'target' && v === '_blank') || (n === 'style' && !/url\s*\(|expression|@import/i.test(v)) || n === 'width' || n === 'height';
+          if (!ok) c.removeAttribute(a.name);
+        });
+        if (c.nodeName === 'A') { c.setAttribute('rel', 'noopener'); if (!c.hasAttribute('target') && /^https?:/i.test(c.getAttribute('href') || '')) c.setAttribute('target', '_blank'); }
+        walk(c);
+      });
+    })(tpl.content);
+    var box = document.createElement('div'); box.appendChild(tpl.content); return box.innerHTML;
+  }
+  function footerContent(T) {
+    var raw = String((S.lang === 'en' && T.footerContentEn.trim() ? T.footerContentEn : T.footerContent) || '').trim();
+    if (!raw) raw = S.lang === 'zh' ? '基于 <a href="https://github.com/komari-monitor/komari">Komari Monitor</a>' : DEFAULT_FOOTER;
+    raw = raw.replace(/\{year\}/g, String(new Date().getFullYear())).replace(/\{sitename\}/g, esc(S.settings.sitename || 'Komari')).replace(/\r?\n/g, '<br>');
+    return sanitizeFooter(raw);
   }
 
   function bindEvents() {
@@ -690,19 +736,29 @@
     if (def === 'expiry') {
       var e = n.expired_at ? new Date(n.expired_at) : null;
       if (!e || isNaN(e.getTime()) || e.getFullYear() < 2000 || e.getFullYear() >= 2099) return 0;
-      return new Date(e.getTime() + S.T.trafficResetUtcOffset * 3600e3).getUTCDate();
+      return new Date(e.getTime() + tzFor(n) * 3600e3).getUTCDate();
     }
     var d = Math.round(num(def));
     return d >= 1 && d <= 31 ? d : 0;
   }
   // cycle boundaries in the configured UTC offset (so every visitor sees the same cycle)
-  function cycleBounds(day, now) {
+  // time zone used for a node's cycle boundaries: its own setting, else the global one
+  function tzFor(n) {
+    var v = n && (S.T.trafficResetTz || {})[n.uuid];
+    v = v === '' || v == null ? NaN : Number(v);
+    return isFinite(v) && v >= -12 && v <= 14 ? v : S.T.trafficResetUtcOffset;
+  }
+  // the reset date as seen in the cycle's own time zone
+  function cycleYMD(c) { var d = new Date(c.next + c.tz * 3600e3); return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate()); }
+  function tzLabel(v) { var h = Math.floor(Math.abs(v)), m = Math.round((Math.abs(v) - h) * 60); return 'UTC' + (v < 0 ? '−' : '+') + h + (m ? ':' + pad2(m) : ''); }
+  function cycleBounds(day, now, tz) {
     if (!day) return null;
-    var shift = S.T.trafficResetUtcOffset * 3600e3, l = new Date(now + shift), y = l.getUTCFullYear(), m = l.getUTCMonth();
+    if (tz == null) tz = S.T.trafficResetUtcOffset;
+    var shift = tz * 3600e3, l = new Date(now + shift), y = l.getUTCFullYear(), m = l.getUTCMonth();
     var at = function (mm) { return Date.UTC(y, mm, Math.min(day, dim(y, mm))) - shift; };
     var thisStart = at(m), start, next;
     if (now >= thisStart) { start = thisStart; next = at(m + 1); } else { start = at(m - 1); next = thisStart; }
-    return { start: start, next: next, day: day, daysLeft: Math.max(0, Math.ceil((next - now) / 86400e3)) };
+    return { start: start, next: next, day: day, tz: tz, daysLeft: Math.max(0, Math.ceil((next - now) / 86400e3)) };
   }
   function calibFor(n) {
     var c = (S.T.trafficCalib || {})[n.uuid];
@@ -713,7 +769,7 @@
   function counterDelta(prev, cur) { return cur >= prev ? cur - prev : cur; }
   // decides how a node's cycle usage is computed
   function trafficPlan(n, now) {
-    var cyc = cycleBounds(resetDayFor(n), now || Date.now()), c = calibFor(n);
+    var cyc = cycleBounds(resetDayFor(n), now || Date.now(), tzFor(n)), c = calibFor(n);
     var calibValid = c && (!cyc || c.t >= cyc.start);
     var engine = calibValid || (S.T.trafficMode === 'theme' && !!cyc);
     var winStart = calibValid ? c.t : cyc ? cyc.start : null;
@@ -1026,7 +1082,7 @@
   function resetTitle(tr) {
     var parts = [];
     parts.push(tr.engine ? _t('Traffic counted by the theme for the current cycle', '本周期流量由主题统计') : _t('Traffic = Komari agent counter', '流量 = Komari 探针计数'));
-    if (tr.cyc) { var d = new Date(tr.cyc.next); parts.push(_t('Next reset ' + dateYMD(d) + ' (day ' + tr.cyc.day + ', ' + (tr.cyc.daysLeft === 0 ? 'today' : 'in ' + tr.cyc.daysLeft + ' days') + ')', '下次重置 ' + dateYMD(d) + '（每月 ' + tr.cyc.day + ' 日，' + (tr.cyc.daysLeft === 0 ? '今天' : tr.cyc.daysLeft + ' 天后') + '）')); }
+    if (tr.cyc) { var d = cycleYMD(tr.cyc); parts.push(_t('Next reset ' + d + ' (day ' + tr.cyc.day + ', ' + (tr.cyc.daysLeft === 0 ? 'today' : 'in ' + tr.cyc.daysLeft + ' days') + ')', '下次重置 ' + d + '（每月 ' + tr.cyc.day + ' 日，' + (tr.cyc.daysLeft === 0 ? '今天' : tr.cyc.daysLeft + ' 天后') + '）') + ' · ' + tzLabel(tr.cyc.tz)); }
     if (tr.calib) parts.push(_t('Calibrated ', '校准于 ') + dateTime(new Date(tr.calib.t)) + (tr.calib.auto ? _t(' (auto checkpoint)', '（自动存档）') : ''));
     if (tr.approx) parts.push(_t('Approximate: record history does not cover the whole cycle', '近似值：记录未覆盖整个周期'));
     return parts.join(' · ');
@@ -1258,6 +1314,7 @@
   // modal
   // ---------------------------------------------------------------
   var RANGES = [[1, '1h'], [8, '8h'], [24, '24h'], [168, '7d']];
+  var HIST_RANGES = RANGES.concat([[720, '30d']]); // load / network history also offers 30 days
   function axisTime(t, hours) {
     var d = new Date(t);
     if (hours <= 24) return clock12(d);
@@ -1357,7 +1414,7 @@
     var top = '<div class="history-bar monitor-divider"><div class="seg" role="group" aria-label="' + _t('Historical metric', '历史指标') + '">' +
         METRICS.map(function (x) { return '<button type="button" data-metric="' + x[0] + '" aria-pressed="' + (m.metric === x[0]) + '">' + _t(x[1], x[2]) + '</button>'; }).join('') +
       '</div><div class="range" role="group" aria-label="' + _t('History range', '时间范围') + '">' +
-        RANGES.map(function (h) { return '<button type="button" data-range="' + h[0] + '" aria-pressed="' + (m.range === h[0]) + '">' + h[1] + '</button>'; }).join('') +
+        HIST_RANGES.map(function (h) { return '<button type="button" data-range="' + h[0] + '" aria-pressed="' + (m.range === h[0]) + '">' + h[1] + '</button>'; }).join('') +
       '</div></div>';
     var body = m.loading && !recs.length ? '<div class="chart-empty">' + _t('Loading telemetry…', '正在加载数据…') + '</div>' : !recs.length ? '<div class="chart-empty">' + _t('No history recorded for this range', '该时间范围内没有记录') + '</div>' : null;
     var idx = m.hover == null ? recs.length - 1 : m.hover;
@@ -1616,7 +1673,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.5.3';
+    sc.src = '/assets/manage.js?v=1.6.0';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
@@ -1630,13 +1687,14 @@
     // traffic helpers for the settings page (evaluate with a draft settings object)
     trafficWith: function (T, n) { var keep = S.T; S.T = T; try { return trafficOf(n); } finally { S.T = keep; } },
     resetDayWith: function (T, n) { var keep = S.T; S.T = T; try { return resetDayFor(n); } finally { S.T = keep; } },
-    cycleWith: function (T, n) { var keep = S.T; S.T = T; try { return cycleBounds(resetDayFor(n), Date.now()); } finally { S.T = keep; } },
+    cycleWith: function (T, n) { var keep = S.T; S.T = T; try { return cycleBounds(resetDayFor(n), Date.now(), tzFor(n)); } finally { S.T = keep; } },
+    tzLabel: tzLabel, cycleYMD: cycleYMD,
     loadTrafficWith: function (T, n) { var keep = S.T; S.T = T; var p = loadTrafficFor(n, true); S.T = keep; return p; },
     liveTotals: function (uuid) { var r = rep(uuid); return r && r.network ? { up: num(r.network.totalUp), down: num(r.network.totalDown) } : null; },
     bytesPrecise: bytesPrecise, dateYMD: dateYMD, dateTime: dateTime,
     // language + fonts
     _t: _t, lang: function () { return S.lang; }, setLang: function (l) { setLang(l); }, onLang: null,
-    FONT_SANS: FONT_SANS, FONT_MONO: FONT_MONO, applyFonts: function (T) { applyFonts(T, false); }
+    FONT_SANS: FONT_SANS, FONT_MONO: FONT_MONO, applyFonts: function (T) { applyFonts(T, false); }, applyFavicon: function (T) { applyFavicon(T, false); }
   };
 
   // switch the UI language in place (header, dashboard or settings page, open modal)
@@ -1663,7 +1721,7 @@
       S.T = normalizeSettings(S.raw);
       S.me = res[1] || { logged_in: false };
       S.lang = pickLang(); applyLangAttr();
-      applyFonts(S.T, true);
+      applyFonts(S.T, true); applyFavicon(S.T, true);
       if (S.settings.private_site && !S.me.logged_in) { privateNotice(); return; }
       S.scheme = lsGet(SCHEME_KEY, '') || S.T.defaultAppearance;
       S.view = lsGet('komari-horizon-view-' + (isMobile() ? 'm' : 'd'), '') || (isMobile() ? S.T.mobileView : S.T.desktopView);

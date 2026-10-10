@@ -247,9 +247,11 @@
     groupSections: true, groupOrder: ['线路机', '落地机', '家宽'], showCardGroup: false,
     baseCurrency: 'CNY', expiryWarningDays: 30, showRemainingValue: true,
     cardProbeTaskIds: ['1', '2', '3'], probeCount: 3, latencyGoodMs: 150, latencyWarnMs: 250,
-    trafficMode: 'agent', trafficResetDefault: 'expiry', trafficResetUtcOffset: 8, trafficResetDays: resetDays,
+    trafficMode: 'agent', trafficResetDefault: 'expiry', trafficResetUtcOffset: 8, trafficResetDays: resetDays, trafficResetTz: tzOverrides(),
     showLossLines: true, lossMarkerStyle: 'line', lossLineOpacity: 75, ratingStyle: 'general'
   };
+  // per-server reset time zone example: US home broadband resets on local (US) time
+  function tzOverrides() { var m = {}; NODES.forEach(function (d) { if (d.name === 'Verizon-NYC.Static') m[d.uuid] = -5; if (d.name === 'Comcast-SJC.Residential') m[d.uuid] = -8; }); return m; }
   function savedSettings() { try { var s = localStorage.getItem(SETTINGS_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
   function currentSettings() { return savedSettings() || JSON.parse(JSON.stringify(DEMO_SETTINGS)); }
 
