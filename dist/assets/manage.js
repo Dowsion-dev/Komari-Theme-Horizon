@@ -303,7 +303,7 @@
       var pingLink = '<a href="/admin/ping" target="_blank" rel="noopener">' + Z('后台 Ping 管理', 'Ping tasks in the admin') + '</a>';
       return section('09', kicker('09'), Z('主页延迟检测与丢包', 'Latency probes and packet loss'), Z('为节点卡片挑选要展示的 Ping 任务：可设置全局默认线路，也可为每台服务器单独覆盖；未配置时展示该节点全部任务中的前 N 个。如果当前还没有可用任务，请先前往 ', 'Pick the ping tasks shown on node cards: global defaults plus per-server overrides; without a choice the first N tasks of the node are shown. No tasks yet? Create them under ') + pingLink + Z(' 创建任务。', '.'),
         '<div class="m-grid2">' +
-          toggle('showProbes', Z('卡片中显示探针', 'Show probes on cards'), Z('标准卡片底部显示最新延迟、最近 1 小时丢包率与 20 格色条（每格为 3 分钟平均延迟）；小卡片显示延迟与丢包率。', 'Standard cards show the latest latency, the last hour\'s loss rate and 20 cells of 3-minute average latency; compact cards show latency and loss.')) +
+          toggle('showProbes', Z('卡片中显示探针', 'Show probes on cards'), Z('标准卡片底部显示最近 1 小时平均延迟、丢包率与 20 格色条（每格为 3 分钟平均延迟）；小卡片显示 1 小时平均延迟与丢包率。', 'Standard cards show the last hour\'s average latency and loss rate plus 20 cells of 3-minute average latency; compact cards show the 1-hour average latency and loss.')) +
           '<div class="m-grid3 tight">' +
             field(Z('每张卡片最多', 'Per card'), input('probeCount', '3', 'number', ' min="1" max="6"'), Z('1–6 个', '1–6')) +
             field(Z('绿色阈值 (ms)', 'Green below (ms)'), input('latencyGoodMs', '150', 'number', ' min="1"')) +

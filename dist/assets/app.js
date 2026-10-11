@@ -1037,17 +1037,18 @@
   // last hour of a task in 20 buckets of 3 minutes (aligned to the clock so they don't shift on every refresh)
   var PB_N = 20, PB_SPAN = 3 * 60e3;
   function probeWindow(recs) {
-    var end = Math.ceil(Date.now() / PB_SPAN) * PB_SPAN, start = end - PB_N * PB_SPAN, b = [], total = 0, lost = 0, last = null;
+    var end = Math.ceil(Date.now() / PB_SPAN) * PB_SPAN, start = end - PB_N * PB_SPAN, b = [], total = 0, lost = 0, last = null, okSum = 0, okN = 0;
     for (var i = 0; i < PB_N; i++) b.push({ t: start + i * PB_SPAN, sum: 0, n: 0, lost: 0, min: Infinity, max: -Infinity });
     (recs || []).forEach(function (r) {
       if (r.t < start || r.t >= end) return;
       var k = b[Math.floor((r.t - start) / PB_SPAN)];
       total++;
-      if (r.v < 0) { k.lost++; lost++; } else { k.sum += r.v; k.n++; k.min = Math.min(k.min, r.v); k.max = Math.max(k.max, r.v); }
+      if (r.v < 0) { k.lost++; lost++; } else { k.sum += r.v; k.n++; k.min = Math.min(k.min, r.v); k.max = Math.max(k.max, r.v); okSum += r.v; okN++; }
       last = r.v;
     });
     b.forEach(function (k) { var c = k.n + k.lost; k.avg = k.n ? k.sum / k.n : c ? -1 : null; k.loss = c ? k.lost / c : 0; });
-    return { buckets: b, total: total, lost: lost, loss: total ? lost / total * 100 : null, last: last };
+    // avg: mean of the successful checks in the last hour (what the cards show); -1 when every check was lost
+    return { buckets: b, total: total, lost: lost, loss: total ? lost / total * 100 : null, last: last, avg: okN ? okSum / okN : total ? -1 : null };
   }
   function lossClass(p) { return p == null ? 'lat-none' : p < 1 ? 'lat-good' : p < 5 ? 'lat-mid' : 'lat-bad'; }
   function fmtLoss(p) { return p == null ? '—' : (p >= 10 ? Math.round(p) : (Math.round(p * 10) / 10).toFixed(1)) + '%'; }
@@ -1072,7 +1073,7 @@
       }).join('');
       return '<div class="probe-card monitor-surface-secondary">' +
         '<div class="probe-top"><span class="probe-name">' + esc(t.name) + '</span><span class="probe-type">' + esc(t.type || 'icmp') + '</span></div>' +
-        '<div class="probe-stats"><div><span class="k">' + _t('Latency', '延迟') + '</span><span class="lat ' + latClass(w.last) + '">' + fmtMs(w.last) + '</span></div>' +
+        '<div class="probe-stats"><div><span class="k" title="' + _t('Average of the last hour', '最近 1 小时平均') + '">' + _t('Latency', '延迟') + '</span><span class="lat ' + latClass(w.avg) + '" title="' + _t('1h average · latest ', '1 小时平均 · 最新 ') + fmtMs(w.last) + '">' + fmtMs(w.avg) + '</span></div>' +
         '<div><span class="k">' + _t('Loss', '丢包率') + '</span><span class="fail ' + lossClass(w.loss) + '">' + fmtLoss(w.loss) + '</span></div></div>' +
         '<div class="probe-bars monitor-divider" aria-label="' + _t('Last hour in 3-minute averages, loss ', '最近 1 小时（每格 3 分钟平均），丢包率 ') + fmtLoss(w.loss) + '">' + bars + '</div>' +
       '</div>';
@@ -1088,7 +1089,7 @@
     var lp = function (p) { return p == null ? '—' : p === 0 ? '0%' : fmtLoss(p); };
     return '<div class="cm-probes" style="grid-template-columns:repeat(' + list.length + ',minmax(0,1fr))">' + list.map(function (t) {
       var w = probeWindow(data[t.id]);
-      return '<span class="cp" title="' + esc(t.name + ' · ' + fmtMs(w.last) + ' · ' + _t('loss ', '丢包率 ') + fmtLoss(w.loss)) + '"><b>' + esc(t.name) + '</b><i class="' + latClass(w.last) + '">' + ms(w.last) + '</i><em class="' + lossClass(w.loss) + '">' + lp(w.loss) + '</em></span>';
+      return '<span class="cp" title="' + esc(t.name + ' · ' + _t('1h avg ', '1 小时平均 ') + fmtMs(w.avg) + ' · ' + _t('loss ', '丢包率 ') + fmtLoss(w.loss)) + '"><b>' + esc(t.name) + '</b><i class="' + latClass(w.avg) + '">' + ms(w.avg) + '</i><em class="' + lossClass(w.loss) + '">' + lp(w.loss) + '</em></span>';
     }).join('') + '</div>';
   }
 
@@ -1853,7 +1854,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.9.2';
+    sc.src = '/assets/manage.js?v=1.9.3';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
