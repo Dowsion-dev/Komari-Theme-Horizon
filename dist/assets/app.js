@@ -550,7 +550,7 @@
         '<div class="quick-filters" id="filters"></div>' +
       '</div></div>' +
       '<div class="container grid-wrap"><section class="node-grid" id="grid"></section></div>' +
-      (T.showFooter ? '<footer class="footer">' + footerContent(T) + '</footer>' : '');
+      '<footer class="footer">' + footerContent(T) + '</footer>';
   }
 
   // footer: admin-written content (a small HTML subset, sanitised) with {year} / {sitename} placeholders
@@ -578,11 +578,13 @@
     })(tpl.content);
     var box = document.createElement('div'); box.appendChild(tpl.content); return box.innerHTML;
   }
+  // Komari's theme rules require "Powered by Komari Monitor" to stay: it is always shown, custom content goes above it
   function footerContent(T) {
     var raw = String((S.lang === 'en' && T.footerContentEn.trim() ? T.footerContentEn : T.footerContent) || '').trim();
-    if (!raw) raw = S.lang === 'zh' ? '基于 <a href="https://github.com/komari-monitor/komari">Komari Monitor</a>' : DEFAULT_FOOTER;
-    raw = raw.replace(/\{year\}/g, String(new Date().getFullYear())).replace(/\{sitename\}/g, esc(S.settings.sitename || 'Komari')).replace(/\r?\n/g, '<br>');
-    return sanitizeFooter(raw);
+    var custom = raw ? sanitizeFooter(raw.replace(/\{year\}/g, String(new Date().getFullYear())).replace(/\{sitename\}/g, esc(S.settings.sitename || 'Komari')).replace(/\r?\n/g, '<br>')) : '';
+    var plain = custom.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    if (custom && /powered by komari monitor/i.test(plain)) return custom;
+    return (custom ? custom + '<br>' : '') + sanitizeFooter(DEFAULT_FOOTER);
   }
 
   // small floating tooltip for elements with data-tip (probe cells); native titles are too slow / tiny there
@@ -1854,7 +1856,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.9.3';
+    sc.src = '/assets/manage.js?v=1.9.4';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);
