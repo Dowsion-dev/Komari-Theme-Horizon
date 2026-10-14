@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Horizon — 高密度控制台风格的 Komari Monitor 主题（演示站，数据为模拟）" />
+    <title>Horizon · Komari 主题演示</title>
+    <link rel="icon" href="favicon.svg" />
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem('komari-horizon-scheme') || 'system';
+          var dark = m === 'dark' || (m === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.className = dark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.className = 'light';
+        }
+        // fonts chosen in the theme settings (cached by app.js), so text renders in the right face from the start
+        var f = null;
+        try { f = JSON.parse(localStorage.getItem('komari-horizon-font') || 'null'); } catch (e) { f = null; }
+        if (!f || !f.css) f = { css: ['https://fonts.googleapis.com/css2?display=swap&family=Plus+Jakarta+Sans:wght@400;500;600;700;800', 'https://fonts.googleapis.com/css2?display=swap&family=JetBrains+Mono:wght@400;500;600'] };
+        for (var i = 0; i < f.css.length; i++) {
+          var l = document.createElement('link');
+          l.rel = 'stylesheet'; l.href = f.css[i]; l.setAttribute('data-hz-font', '');
+          document.head.appendChild(l);
+        }
+        if (f.faces && f.faces.length) { var st = document.createElement('style'); st.id = 'hz-font-faces'; st.textContent = f.faces.join('\n'); document.head.appendChild(st); }
+        try {
+          var ic = localStorage.getItem('komari-horizon-favicon');
+          var il = document.querySelector('link[rel~="icon"]');
+          if (ic && il) { il.setAttribute('data-default', il.getAttribute('href')); il.setAttribute('href', ic); }
+        } catch (e) { /* ignore */ }
+        var rs = document.documentElement.style;
+        if (f.sans) rs.setProperty('--font-sans', f.sans);
+        if (f.mono) rs.setProperty('--font-mono', f.mono);
+      })();
+    </script>
+    <script src="demo.js?v=1.9.4"></script>
+    <link rel="stylesheet" href="assets/app.css?v=1.9.4" />
+    <script src="assets/icons.js?v=1.9.4" defer></script>
+    <script src="assets/app.js?v=1.9.4" defer></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
