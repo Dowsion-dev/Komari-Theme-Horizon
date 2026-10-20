@@ -225,6 +225,7 @@
     // 03 background
     enableBackground: true, backgroundMediaType: 'image', backgroundImage: '', backgroundImageMobile: '', backgroundVideo: '', backgroundVideoDark: '',
     backgroundFit: 'cover', backgroundAlign: 'center', surfaceOpacity: 100, enableAmbientEffect: false, ambientEffect: 'sakura',
+    enableGlass: true, glassBlur: 18,
     // 04 home
     enableHeaderAutoHide: false, headerVisibleSeconds: 10, showHomeOverview: true, showGroupFilter: true, showRegionFilter: true,
     showCardGroup: true, groupSections: false, enableHomeSort: true, homeSortField: 'default', homeSortDirection: 'asc', groupOrder: [],
@@ -288,6 +289,7 @@
       else out[k] = String(v);
     });
     out.surfaceOpacity = clamp(Math.round(out.surfaceOpacity), 0, 100);
+    out.glassBlur = clamp(Math.round(out.glassBlur), 4, 40);
     out.headerVisibleSeconds = clamp(Math.round(out.headerVisibleSeconds), 1, 3600);
     out.probeCount = clamp(Math.round(out.probeCount) || 3, 1, 6);
     out.lossLineOpacity = clamp(Math.round(out.lossLineOpacity), 10, 100);
@@ -403,6 +405,9 @@
     app.classList.toggle('has-bg', has);
     app.classList.toggle('has-veil', has && T.surfaceOpacity < 95);
     app.style.setProperty('--sop', has ? String(T.surfaceOpacity / 100) : '1');
+    // frosted glass: translucent surfaces that blur whatever sits behind them (custom background or the theme's colour wash)
+    app.classList.toggle('is-glass', !!T.enableGlass);
+    app.style.setProperty('--glass-blur', T.glassBlur + 'px');
     var pos = T.backgroundAlign === 'top' ? 'center top' : T.backgroundAlign === 'bottom' ? 'center bottom' : 'center center';
     var key = [img, video, T.backgroundFit, pos].join('|');
     if (layer.dataset.key === key) return;
@@ -1186,6 +1191,16 @@
     if (tr.approx) parts.push(_t('Approximate: record history does not cover the whole cycle', '近似值：记录未覆盖整个周期'));
     return parts.join(' · ');
   }
+  // red "Offline · 3h" pill shown in place of the alert bell / uptime chip
+  function offlineBadge(n) {
+    var r = rep(n.uuid), d = r && r.updated_at ? new Date(r.updated_at) : null, ago = '';
+    if (d && !isNaN(d)) {
+      var m = Math.floor((Date.now() - d) / 60000);
+      if (m >= 1) ago = m < 60 ? m + _t('m', ' 分钟') : m < 2880 ? Math.floor(m / 60) + _t('h', ' 小时') : Math.floor(m / 1440) + _t('d', ' 天');
+    }
+    return '<span class="node-offline-badge" role="img" aria-label="' + _t('Node offline', '节点离线') + '" title="' + esc(_t('Last report ', '最后上报 ') + lastSeen(n.uuid)) + '">' +
+      icon('wifi-off') + '<span>' + _t('Offline', '离线') + '</span>' + (ago ? '<i>' + ago + '</i>' : '') + '</span>';
+  }
   function cardHTML(n) {
     var T = S.T, V = nodeView(n), net = V.net, region = n.region || '';
     var tr = trafficOf(n), limit = num(n.traffic_limit), ax = tr.approx || tr.pending ? '≈ ' : '';
@@ -1211,7 +1226,7 @@
       '<h3 class="node-title"><span class="node-status-dot" aria-hidden="true"></span><span class="node-name">' + esc(n.name) + '</span>' +
       (V.group ? '<span class="node-provider-sep" aria-hidden="true">·</span><span class="node-provider">' + esc(V.group) + '</span>' : '') +
       '</h3></div>' +
-      '<span role="img" aria-label="' + (V.on ? _t('No active alerts', '无告警') : _t('Node offline', '节点离线')) + '" class="node-alert-status' + (V.on ? '' : ' warn') + '">' + icon(V.on ? 'bell' : 'wifi-off') + '</span></div>' +
+      (V.on ? '<span role="img" aria-label="' + _t('No active alerts', '无告警') + '" class="node-alert-status">' + icon('bell') + '</span>' : offlineBadge(n)) + '</div>' +
       '<div class="node-meta" aria-label="' + _t('Machine metadata', '机器信息') + '">' +
         (region ? '<span class="chip">' + flagImg(region) + ' ' + esc(regionLabel(region)) + '</span>' : '') +
         (n.arch ? '<span class="chip">' + esc(n.arch) + '</span>' : '') +
@@ -1248,7 +1263,7 @@
     var h = '<div><div class="node-head-row"><div class="node-ident">' +
       '<div class="node-os monitor-chip">' + osIcon(n.os) + '</div>' +
       '<h3 class="node-title"><span class="node-status-dot" aria-hidden="true"></span>' + (n.region ? flagImg(n.region) + ' ' : '') + '<span class="node-name">' + esc(n.name) + '</span></h3></div>' +
-      (T.compactShowUptime ? '<span class="chip">' + icon(V.on ? 'clock' : 'cloud-off') + (V.on ? uptime(V.r.uptime) : _t('Offline', '离线')) + '</span>' : '') + '</div>' +
+      (!V.on ? offlineBadge(n) : T.compactShowUptime ? '<span class="chip">' + icon('clock') + uptime(V.r.uptime) + '</span>' : '') + '</div>' +
       '<div class="cm-grid">' + meter('CPU', V.cpu, 'g-blue') + meter(_t('MEM', '内存'), pct(V.memU, V.memT), 'g-emerald') + meter(_t('DISK', '硬盘'), pct(V.diskU, V.diskT), 'g-amber') +
         '<div class="cm" title="' + _t('Load average (1m), bar = load / cores', '1 分钟平均负载，进度 = 负载 / 核心数') + '"><div class="cm-top"><span>' + _t('LOAD', '负载') + '</span><b>' + num(V.load.load1).toFixed(2) + '</b></div><div class="bar"><div class="g-pink" style="width:' + clamp(loadPct(V), 0, 100) + '%"></div></div></div></div>' +
       compactProbes(n) +
@@ -1856,7 +1871,7 @@
       return;
     }
     var sc = document.createElement('script');
-    sc.src = '/assets/manage.js?v=1.9.4';
+    sc.src = '/assets/manage.js?v=1.10.0';
     sc.onload = function () { window.KHorizonManage(page, KC); };
     sc.onerror = function () { page.innerHTML = '<div class="container"><div class="banner monitor-surface-primary">' + _t('Could not load manage.js', '无法加载 manage.js') + '</div></div>'; };
     document.head.appendChild(sc);

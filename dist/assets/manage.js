@@ -128,6 +128,11 @@
           toggle('enableBackground', Z('启用自定义背景', 'Enable custom background'), Z('关闭后不加载任何背景图或视频（下方地址会保留），站点回到纯色主题。', 'When off, no image or video is loaded (the URLs below are kept).')) +
           toggle('enableAmbientEffect', Z('启用背景动效', 'Enable ambient effect'), Z('默认关闭；开启后轻量渲染所选氛围效果，不影响点击和滚动。', 'Off by default; a lightweight animation that never blocks clicks or scrolling.')) +
         '</div>' +
+        '<div class="m-grid2">' +
+          toggle('enableGlass', Z('毛玻璃效果', 'Frosted glass'), Z('卡片、顶部栏与总览面板半透明并模糊身后的内容；未设置背景图时会铺一层柔和的色彩底，让玻璃质感可见。', 'Cards, header and overview panels turn translucent and blur what is behind them; without a background image a soft colour wash is added so the glass reads.')) +
+          (D.enableGlass ? field(Z('模糊强度', 'Blur strength'), '<div class="m-range"><input type="range" min="4" max="40" step="1" data-k="glassBlur" data-type="number" value="' + D.glassBlur + '"><input class="m-input m-num" type="number" min="4" max="40" data-k="glassBlur" data-type="number" value="' + D.glassBlur + '"><span>px</span></div>',
+            Z('默认 18px；数值越大越朦胧，低端设备可调低以减轻渲染压力。', 'Default 18px; higher is hazier. Lower it on slow devices.')) : '<div></div>') +
+        '</div>' +
         (D.enableAmbientEffect ? field(Z('动效选择', 'Effect'), seg('ambientEffect', [['sakura', Z('樱花飘落', 'Sakura')], ['rain', Z('细雨', 'Rain')], ['snow', Z('缓雪', 'Snow')], ['leaves', Z('秋叶飘落', 'Leaves')], ['confetti', Z('庆典彩纸', 'Confetti')], ['fireworks', Z('烟花', 'Fireworks')]]), Z('移动端自动减少粒子数量；系统开启“减少动态效果”时不播放。', 'Fewer particles on mobile; disabled when the system asks for reduced motion.')) : '') +
         field(Z('桌面端背景类型', 'Desktop background type'), seg('backgroundMediaType', [['image', Z('图片', 'Image'), 'image'], ['video', Z('视频', 'Video'), 'monitor']])) +
         '<div class="m-grid2">' +

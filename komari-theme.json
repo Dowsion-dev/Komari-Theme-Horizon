@@ -3,7 +3,7 @@
   "short": "horizon",
   "description": "高密度控制台风格的 Komari 主题：集群总览、节点卡片、流量周期与校准、延迟探针与丢包率、历史图表，中英双语，自定义字体与背景。A dense console-style Komari theme with cluster overview, node cards, traffic cycles, latency probes and packet loss, history charts, zh/en UI.",
   "author": "Dowsion",
-  "version": "1.9.4",
+  "version": "1.10.0",
   "url": "https://github.com/Dowsion-dev/Komari-Theme-Horizon",
   "preview": "preview.png"
 }
